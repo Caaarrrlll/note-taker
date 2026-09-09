@@ -1,0 +1,26 @@
+# Rust build artifacts
+/target
+/src-tauri/target
+
+# Tauri generated files
+/src-tauri/gen/schemas/
+/src-tauri/gen/*
+!/src-tauri/gen
+
+# Frontend dependencies
+/node_modules
+/dist
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "tauri",
+      "request": "launch",
+      "name": "Tauri Dev (cargo tauri dev)",
+      "cargo": {
+        "args": ["--manifest-path", "./src-tauri/Cargo.toml"]
+      },
+      "env": {
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/note_taker"
+      },
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Dev (Debug Build)",
+      "cargo": {
+        "args": ["build", "--manifest-path", "./src-tauri/Cargo.toml"],
+        "filter": {
+          "name": "note-taker",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "env": {
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/note_taker"
+      },
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
