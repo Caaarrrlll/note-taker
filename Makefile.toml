@@ -1,0 +1,51 @@
+[config]
+default_to_workspace = false
+
+[tasks.clean]
+description = "Remove Rust build artifacts"
+workspace = false
+cwd = "src-tauri"
+command = "cargo"
+args = ["clean"]
+
+[tasks.clean-frontend]
+description = "Remove frontend build artifacts"
+script = ["Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"]
+
+[tasks.clean-all]
+description = "Remove all build artifacts and dependencies"
+dependencies = ["clean"]
+script = '''
+Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+'''
+
+[tasks.clean-git]
+description = "Remove all untracked files (git clean)"
+script = '''
+git clean -fd
+'''
+
+[tasks.clean-git-dry]
+description = "Preview what git clean would remove"
+script = '''
+git clean -fdn
+'''
+
+[tasks.build]
+description = "Build the Tauri application"
+script = '''
+cargo tauri build
+'''
+
+[tasks.dev]
+description = "Run Tauri in development mode"
+script = '''
+cargo tauri dev
+'''
+
+[tasks.install]
+description = "Install frontend dependencies"
+script = '''
+npm install
+'''
