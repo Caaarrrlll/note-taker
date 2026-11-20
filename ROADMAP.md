@@ -55,8 +55,8 @@ The same code and migrations run on SQLite, PostgreSQL and MySQL/MariaDB. The ap
 **Testing**
 - [x] Service tests run on in-memory SQLite by default (`cargo make test`)
 - [x] `TEST_DATABASE_URL` runs the same tests against any existing Postgres or MySQL/MariaDB database
-- [x] Verified: 7/7 tests passing on SQLite, PostgreSQL 17, MySQL 8.4 and MariaDB 11.4. Re-check MySQL and MariaDB against the `DATETIME(6)` change.
-- [x] CI workflow (`.github/workflows/ci.yml`): frontend build, clippy, SQLite tests, plus PostgreSQL, MySQL and MariaDB tests in CI service containers. Not run yet; first run happens on push.
+- [x] Verified in CI: all tests pass on SQLite, PostgreSQL 17, MySQL 8.4 and MariaDB 11.4
+- [x] CI workflow (`.github/workflows/ci.yml`): frontend build, clippy, SQLite tests, plus PostgreSQL, MySQL and MariaDB tests in CI service containers. Passing.
 
 ## Phase 2: Database transfer tool
 
