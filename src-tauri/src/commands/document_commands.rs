@@ -1,69 +1,102 @@
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use sea_orm::DatabaseConnection;
+use serde::Serialize;
+use tauri::State;
 use uuid::Uuid;
 
-use crate::services;
+use crate::entities::documents;
+use crate::error::AppResult;
+use crate::services::document_service;
+use crate::session::Session;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentResponse {
     pub id: Uuid,
     pub title: String,
     pub workspace_id: Uuid,
+    pub parent_id: Option<Uuid>,
     pub is_archived: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-impl From<crate::entities::documents::Model> for DocumentResponse {
-    fn from(m: crate::entities::documents::Model) -> Self {
+impl From<documents::Model> for DocumentResponse {
+    fn from(m: documents::Model) -> Self {
         Self {
             id: m.id,
             title: m.title,
             workspace_id: m.workspace_id,
+            parent_id: m.parent_id,
             is_archived: m.is_archived,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
         }
     }
 }
 
 #[tauri::command]
+pub async fn list_documents(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    workspace_id: Uuid,
+) -> AppResult<Vec<DocumentResponse>> {
+    let user_id = session.require_user()?;
+    let docs = document_service::list_documents(db.inner(), user_id, workspace_id).await?;
+    Ok(docs.into_iter().map(Into::into).collect())
+}
+
+#[tauri::command]
+pub async fn get_document(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+) -> AppResult<DocumentResponse> {
+    let user_id = session.require_user()?;
+    Ok(document_service::get_owned_document(db.inner(), user_id, id).await?.into())
+}
+
+#[tauri::command]
 pub async fn create_document(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
     workspace_id: Uuid,
     title: String,
     parent_id: Option<Uuid>,
-) -> Result<DocumentResponse, String> {
-    services::create_document(workspace_id, &title, parent_id)
-        .await
-        .map(DocumentResponse::from)
-        .map_err(|e| e.to_string())
+) -> AppResult<DocumentResponse> {
+    let user_id = session.require_user()?;
+    Ok(document_service::create_document(db.inner(), user_id, workspace_id, &title, parent_id).await?.into())
 }
 
 #[tauri::command]
-pub async fn get_document(id: Uuid) -> Result<DocumentResponse, String> {
-    services::get_document(id)
-        .await
-        .ok()
-        .flatten()
-        .map(DocumentResponse::from)
-        .ok_or_else(|| "Document not found".to_string())
+pub async fn update_document_title(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+    title: String,
+) -> AppResult<DocumentResponse> {
+    let user_id = session.require_user()?;
+    Ok(document_service::update_document_title(db.inner(), user_id, id, &title).await?.into())
+}
+
+/// Archives the page and everything nested under it; returns the archived IDs.
+#[tauri::command]
+pub async fn archive_document(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+) -> AppResult<Vec<Uuid>> {
+    let user_id = session.require_user()?;
+    document_service::archive_document(db.inner(), user_id, id).await
 }
 
 #[tauri::command]
-pub async fn list_documents(workspace_id: Uuid) -> Result<Vec<DocumentResponse>, String> {
-    services::list_documents(workspace_id)
-        .await
-        .map(|docs| docs.into_iter().map(DocumentResponse::from).collect())
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn update_document_title(id: Uuid, title: String) -> Result<DocumentResponse, String> {
-    services::update_document_title(id, &title)
-        .await
-        .map(DocumentResponse::from)
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn archive_document(id: Uuid) -> Result<DocumentResponse, String> {
-    services::archive_document(id)
-        .await
-        .map(DocumentResponse::from)
-        .map_err(|e| e.to_string())
+pub async fn move_document(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+    parent_id: Option<Uuid>,
+) -> AppResult<DocumentResponse> {
+    let user_id = session.require_user()?;
+    Ok(document_service::move_document(db.inner(), user_id, id, parent_id).await?.into())
 }

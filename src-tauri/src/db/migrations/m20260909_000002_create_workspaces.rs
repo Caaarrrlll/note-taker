@@ -12,10 +12,10 @@ impl MigrationTrait for Migration {
                     .table(Workspaces::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Workspaces::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(Workspaces::Name).string().not_null())
+                    .col(ColumnDef::new(Workspaces::Name).string_len(255).not_null())
                     .col(ColumnDef::new(Workspaces::OwnerId).uuid().not_null())
-                    .col(ColumnDef::new(Workspaces::CreatedAt).timestamp_with_time_zone().not_null().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Workspaces::UpdatedAt).timestamp_with_time_zone().not_null().default(Expr::current_timestamp()))
+                    .col(super::utc_timestamp(manager, Workspaces::CreatedAt))
+                    .col(super::utc_timestamp(manager, Workspaces::UpdatedAt))
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_workspace_owner")

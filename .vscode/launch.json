@@ -8,9 +8,6 @@
       "cargo": {
         "args": ["--manifest-path", "./src-tauri/Cargo.toml"]
       },
-      "env": {
-        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/note_taker"
-      },
       "cwd": "${workspaceFolder}"
     },
     {
@@ -25,9 +22,6 @@
         }
       },
       "args": [],
-      "env": {
-        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/note_taker"
-      },
       "cwd": "${workspaceFolder}"
     }
   ]

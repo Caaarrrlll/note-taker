@@ -12,11 +12,13 @@ impl MigrationTrait for Migration {
                     .table(Users::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Users::Id).uuid().not_null().primary_key())
-                    .col(ColumnDef::new(Users::Email).string().not_null().unique_key())
-                    .col(ColumnDef::new(Users::DisplayName).string().not_null())
-                    .col(ColumnDef::new(Users::PasswordHash).string().not_null())
-                    .col(ColumnDef::new(Users::CreatedAt).timestamp_with_time_zone().not_null().default(Expr::current_timestamp()))
-                    .col(ColumnDef::new(Users::UpdatedAt).timestamp_with_time_zone().not_null().default(Expr::current_timestamp()))
+                    .col(ColumnDef::new(Users::Email).string_len(255).not_null().unique_key())
+                    .col(ColumnDef::new(Users::DisplayName).string_len(255).not_null())
+                    // NULL for the passwordless local user (see services::auth_service).
+                    .col(ColumnDef::new(Users::PasswordHash).string_len(255).null())
+                    .col(ColumnDef::new(Users::IsLocal).boolean().not_null().default(false))
+                    .col(super::utc_timestamp(manager, Users::CreatedAt))
+                    .col(super::utc_timestamp(manager, Users::UpdatedAt))
                     .to_owned(),
             )
             .await
@@ -36,6 +38,7 @@ enum Users {
     Email,
     DisplayName,
     PasswordHash,
+    IsLocal,
     CreatedAt,
     UpdatedAt,
 }
