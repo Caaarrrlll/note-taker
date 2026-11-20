@@ -1,0 +1,120 @@
+# Checks every push to master and every pull request:
+#   - frontend: typecheck + production build
+#   - backend: clippy + tests on SQLite
+#   - backend on server DBs: the same tests against PostgreSQL, MySQL and MariaDB
+#     (throwaway service containers on the GitHub runner, never on your machine)
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  backend:
+    name: backend (sqlite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # Tauri's build script expects the frontend output dir to exist.
+      - run: mkdir -p dist
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Tests (in-memory SQLite)
+        working-directory: src-tauri
+        run: cargo test
+
+  backend-server-db:
+    name: backend (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - db: postgres
+            image: postgres:17
+            port: 5432
+            url: postgres://note_taker:note_taker@127.0.0.1:5432/note_taker
+            health: pg_isready -U note_taker
+          - db: mysql
+            image: mysql:8.4
+            port: 3306
+            url: mysql://note_taker:note_taker@127.0.0.1:3306/note_taker
+            health: mysqladmin ping -h 127.0.0.1 -uroot -proot
+          - db: mariadb
+            image: mariadb:11.4
+            port: 3306
+            url: mysql://note_taker:note_taker@127.0.0.1:3306/note_taker
+            health: healthcheck.sh --connect --innodb_initialized
+    services:
+      db:
+        image: ${{ matrix.image }}
+        # Each image only reads its own variables; the rest are ignored.
+        env:
+          POSTGRES_USER: note_taker
+          POSTGRES_PASSWORD: note_taker
+          POSTGRES_DB: note_taker
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: note_taker
+          MYSQL_USER: note_taker
+          MYSQL_PASSWORD: note_taker
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: note_taker
+          MARIADB_USER: note_taker
+          MARIADB_PASSWORD: note_taker
+        ports:
+          - ${{ matrix.port }}:${{ matrix.port }}
+        options: >-
+          --health-cmd "${{ matrix.health }}"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: mkdir -p dist
+      - name: Tests (${{ matrix.db }})
+        working-directory: src-tauri
+        env:
+          TEST_DATABASE_URL: ${{ matrix.url }}
+        run: cargo test --lib

@@ -24,3 +24,5 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 desktop.ini
+# Serena (MCP tool) project cache
+.serena/

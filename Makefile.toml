@@ -49,3 +49,21 @@ description = "Install frontend dependencies"
 script = '''
 npm install
 '''
+
+[tasks.test]
+description = "Run backend tests (in-memory SQLite; set TEST_DATABASE_URL to test a server DB)"
+cwd = "src-tauri"
+command = "cargo"
+args = ["test"]
+
+[tasks.bundle]
+description = "Build installers for the current OS (Windows: .msi + .exe; Linux: .deb + AppImage; macOS: .dmg)"
+command = "npm"
+args = ["run", "tauri", "build"]
+
+[tasks.icons]
+description = "Regenerate all app icons from src-tauri/icons/app-icon.svg"
+script = '''
+npm run tauri icon src-tauri/icons/app-icon.svg
+Remove-Item -Recurse -Force src-tauri/icons/android, src-tauri/icons/ios -ErrorAction SilentlyContinue
+'''

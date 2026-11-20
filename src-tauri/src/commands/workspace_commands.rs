@@ -1,37 +1,42 @@
-use serde::{Deserialize, Serialize};
+use sea_orm::DatabaseConnection;
+use serde::Serialize;
+use tauri::State;
 use uuid::Uuid;
 
-use crate::services;
+use crate::entities::workspaces;
+use crate::error::AppResult;
+use crate::services::workspace_service;
+use crate::session::Session;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceResponse {
     pub id: Uuid,
     pub name: String,
-    pub owner_id: Uuid,
 }
 
-impl From<crate::entities::workspaces::Model> for WorkspaceResponse {
-    fn from(m: crate::entities::workspaces::Model) -> Self {
-        Self {
-            id: m.id,
-            name: m.name,
-            owner_id: m.owner_id,
-        }
+impl From<workspaces::Model> for WorkspaceResponse {
+    fn from(m: workspaces::Model) -> Self {
+        Self { id: m.id, name: m.name }
     }
 }
 
 #[tauri::command]
-pub async fn create_workspace(owner_id: Uuid, name: String) -> Result<WorkspaceResponse, String> {
-    services::create_workspace(owner_id, &name)
-        .await
-        .map(WorkspaceResponse::from)
-        .map_err(|e| e.to_string())
+pub async fn list_workspaces(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+) -> AppResult<Vec<WorkspaceResponse>> {
+    let user_id = session.require_user()?;
+    let list = workspace_service::list_user_workspaces(db.inner(), user_id).await?;
+    Ok(list.into_iter().map(Into::into).collect())
 }
 
 #[tauri::command]
-pub async fn list_workspaces(owner_id: Uuid) -> Result<Vec<WorkspaceResponse>, String> {
-    services::list_user_workspaces(owner_id)
-        .await
-        .map(|ws| ws.into_iter().map(WorkspaceResponse::from).collect())
-        .map_err(|e| e.to_string())
+pub async fn create_workspace(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    name: String,
+) -> AppResult<WorkspaceResponse> {
+    let user_id = session.require_user()?;
+    Ok(workspace_service::create_workspace(db.inner(), user_id, &name).await?.into())
 }

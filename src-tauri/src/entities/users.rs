@@ -9,9 +9,13 @@ pub struct Model {
     #[sea_orm(unique)]
     pub email: String,
     pub display_name: String,
-    pub password_hash: String,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
+    /// `None` for the passwordless local user.
+    #[serde(skip_serializing)]
+    pub password_hash: Option<String>,
+    /// The automatic single user of local mode.
+    pub is_local: bool,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -26,4 +30,12 @@ impl Related<super::workspaces::Entity> for Entity {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+#[async_trait::async_trait]
+impl ActiveModelBehavior for ActiveModel {
+    async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        Ok(super::touch_timestamps!(self, insert))
+    }
+}

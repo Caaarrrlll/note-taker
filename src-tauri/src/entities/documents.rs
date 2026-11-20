@@ -10,8 +10,8 @@ pub struct Model {
     pub workspace_id: Uuid,
     pub parent_id: Option<Uuid>,
     pub is_archived: bool,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -44,4 +44,12 @@ impl Related<super::blocks::Entity> for Entity {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+#[async_trait::async_trait]
+impl ActiveModelBehavior for ActiveModel {
+    async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
+    where
+        C: ConnectionTrait,
+    {
+        Ok(super::touch_timestamps!(self, insert))
+    }
+}
