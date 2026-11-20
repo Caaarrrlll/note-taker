@@ -5,8 +5,11 @@ import { storage } from "./hooks";
 import { PagesContext, type PagesContextValue } from "./pagesContext";
 import { Sidebar } from "./components/Sidebar";
 import { PageView } from "./components/PageView";
+import { Trash } from "./components/Trash";
 
 const LAST_PAGE_KEY = "lastPageId";
+
+const byCreatedAt = (a: Doc, b: Doc) => Date.parse(a.createdAt) - Date.parse(b.createdAt);
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -14,6 +17,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   const reportError = useCallback((e: unknown) => setError(errorMessage(e)), []);
 
@@ -79,6 +83,23 @@ export default function App() {
     [reportError],
   );
 
+  // Put restored pages back into the list (in creation order, like a fresh load).
+  const addRestored = useCallback((restored: Doc[]) => {
+    const ids = new Set(restored.map((d) => d.id));
+    setDocs((prev) => [...prev.filter((d) => !ids.has(d.id)), ...restored].sort(byCreatedAt));
+  }, []);
+
+  const restorePage = useCallback(
+    async (id: string, opts?: { quiet?: boolean }) => {
+      try {
+        addRestored(await api.restoreDocument(id));
+      } catch (e) {
+        if (!opts?.quiet) reportError(e);
+      }
+    },
+    [addRestored, reportError],
+  );
+
   // Local title update (PageView persists it); keeps the sidebar in sync while typing.
   const setTitle = useCallback((id: string, title: string) => {
     setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
@@ -91,8 +112,10 @@ export default function App() {
       docsById: new Map(docs.map((d) => [d.id, d])),
       openPage: setSelectedId,
       createSubpage: (parentId) => createDocument(parentId),
+      trashPage: archivePage,
+      restorePage,
     }),
-    [docs, createDocument],
+    [docs, createDocument, archivePage, restorePage],
   );
 
   return (
@@ -105,6 +128,7 @@ export default function App() {
           onSelect={setSelectedId}
           onCreate={createPage}
           onArchive={archivePage}
+          onOpenTrash={() => setTrashOpen(true)}
         />
         <main className="main">
           {error && (
@@ -126,6 +150,18 @@ export default function App() {
             </div>
           )}
         </main>
+        {trashOpen && workspace && (
+          <Trash
+            workspaceId={workspace.id}
+            onRestored={(restored, id) => {
+              addRestored(restored);
+              setSelectedId(id);
+              setTrashOpen(false);
+            }}
+            onClose={() => setTrashOpen(false)}
+            onError={reportError}
+          />
+        )}
       </div>
     </PagesContext.Provider>
   );

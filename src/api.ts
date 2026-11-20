@@ -63,6 +63,13 @@ export const api = {
   archiveDocument: (id: string) => invoke<string[]>("archive_document", { id }),
   moveDocument: (id: string, parentId: string | null) => invoke<Doc>("move_document", { id, parentId }),
 
+  /** Trash: archived pages, most recently deleted first. */
+  listArchivedDocuments: (workspaceId: string) => invoke<Doc[]>("list_archived_documents", { workspaceId }),
+  /** Restores the page and its nested pages; resolves to the restored pages. */
+  restoreDocument: (id: string) => invoke<Doc[]>("restore_document", { id }),
+  /** Permanently deletes a trashed page and its nested pages; resolves to the deleted IDs. */
+  deleteDocumentPermanently: (id: string) => invoke<string[]>("delete_document_permanently", { id }),
+
   getDocumentBlocks: (documentId: string) => invoke<StoredBlock[]>("get_document_blocks", { documentId }),
   saveDocumentBlocks: (documentId: string, blocks: BlockInput[]) =>
     invoke<void>("save_document_blocks", { documentId, blocks }),

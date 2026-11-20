@@ -140,3 +140,73 @@ pub async fn move_document<C: ConnectionTrait>(
     active.parent_id = Set(new_parent_id);
     Ok(active.update(db).await?)
 }
+
+/// Archived ("in the trash") documents of a workspace, most recently deleted first.
+pub async fn list_archived_documents<C: ConnectionTrait>(
+    db: &C,
+    user_id: Uuid,
+    workspace_id: Uuid,
+) -> AppResult<Vec<documents::Model>> {
+    get_owned_workspace(db, user_id, workspace_id).await?;
+    Ok(documents::Entity::find()
+        .filter(documents::Column::WorkspaceId.eq(workspace_id))
+        .filter(documents::Column::IsArchived.eq(true))
+        .order_by_desc(documents::Column::UpdatedAt)
+        .all(db)
+        .await?)
+}
+
+/// Restore an archived page and the pages nested under it. If its parent is
+/// still in the trash, the page is restored to the top level instead.
+/// Returns the restored documents.
+pub async fn restore_document<C: ConnectionTrait>(db: &C, user_id: Uuid, id: Uuid) -> AppResult<Vec<documents::Model>> {
+    let doc = get_owned_document(db, user_id, id).await?;
+
+    if let Some(parent_id) = doc.parent_id {
+        let parent_archived = documents::Entity::find_by_id(parent_id)
+            .one(db)
+            .await?
+            .is_none_or(|p| p.is_archived);
+        if parent_archived {
+            let mut active: documents::ActiveModel = doc.into();
+            active.parent_id = Set(None);
+            active.update(db).await?;
+        }
+    }
+
+    let mut ids = vec![id];
+    ids.extend(descendant_ids(db, id).await?);
+    documents::Entity::update_many()
+        .col_expr(documents::Column::IsArchived, Expr::value(false))
+        .col_expr(documents::Column::UpdatedAt, Expr::value(Utc::now()))
+        .filter(documents::Column::Id.is_in(ids.clone()))
+        .exec(db)
+        .await?;
+
+    Ok(documents::Entity::find()
+        .filter(documents::Column::Id.is_in(ids))
+        .order_by_asc(documents::Column::CreatedAt)
+        .all(db)
+        .await?)
+}
+
+/// Permanently delete a page that is in the trash, with its nested pages and
+/// all their content. Returns the deleted IDs.
+pub async fn delete_document_permanently<C: ConnectionTrait>(db: &C, user_id: Uuid, id: Uuid) -> AppResult<Vec<Uuid>> {
+    let doc = get_owned_document(db, user_id, id).await?;
+    if !doc.is_archived {
+        return Err(AppError::Invalid("Move the page to the trash before deleting it permanently".into()));
+    }
+
+    // Deepest pages first, so no row is deleted while a child still points at it.
+    let mut ids = descendant_ids(db, id).await?;
+    ids.reverse();
+    ids.push(id);
+    for chunk in ids.chunks(500) {
+        documents::Entity::delete_many()
+            .filter(documents::Column::Id.is_in(chunk.to_vec()))
+            .exec(db)
+            .await?;
+    }
+    Ok(ids)
+}

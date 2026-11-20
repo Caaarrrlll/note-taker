@@ -195,6 +195,66 @@ async fn archiving_a_page_archives_its_descendants() {
 }
 
 #[tokio::test]
+async fn trash_lists_restores_and_permanently_deletes() {
+    let db = test_db().await;
+    let (user, ws) = seed_workspace(&db).await;
+    let a = create_document(&db, user, ws.id, "A", None).await.unwrap();
+    let b = create_document(&db, user, ws.id, "B", Some(a.id)).await.unwrap();
+    let c = create_document(&db, user, ws.id, "C", Some(b.id)).await.unwrap();
+    save_document_blocks(&db, user, c.id, vec![block(None, "paragraph", "deep content")]).await.unwrap();
+    let c_block = get_document_blocks(&db, user, c.id).await.unwrap()[0].id;
+
+    archive_document(&db, user, a.id).await.unwrap();
+    let trash: Vec<Uuid> = list_archived_documents(&db, user, ws.id).await.unwrap().iter().map(|d| d.id).collect();
+    assert_eq!(trash.len(), 3);
+    assert!(trash.contains(&a.id) && trash.contains(&b.id) && trash.contains(&c.id));
+
+    // Restoring B while its parent A is still in the trash: B (and C) come back at the top level.
+    let restored = restore_document(&db, user, b.id).await.unwrap();
+    let mut restored_ids: Vec<Uuid> = restored.iter().map(|d| d.id).collect();
+    restored_ids.sort();
+    let mut expected = vec![b.id, c.id];
+    expected.sort();
+    assert_eq!(restored_ids, expected);
+    let b_now = get_owned_document(&db, user, b.id).await.unwrap();
+    assert_eq!(b_now.parent_id, None, "restored to top level because its parent is in the trash");
+    assert!(!b_now.is_archived);
+    assert_eq!(get_owned_document(&db, user, c.id).await.unwrap().parent_id, Some(b.id), "C stays under B");
+    assert_eq!(get_document_blocks(&db, user, c.id).await.unwrap().len(), 1, "content survives the trash");
+
+    // Only trashed pages can be deleted permanently.
+    assert!(matches!(delete_document_permanently(&db, user, b.id).await, Err(AppError::Invalid(_))));
+
+    // Re-trash B (with C), then delete it for good: pages and their blocks are gone.
+    archive_document(&db, user, b.id).await.unwrap();
+    let mut deleted = delete_document_permanently(&db, user, b.id).await.unwrap();
+    deleted.sort();
+    assert_eq!(deleted, expected);
+    assert!(documents::Entity::find_by_id(b.id).one(&db).await.unwrap().is_none());
+    assert!(documents::Entity::find_by_id(c.id).one(&db).await.unwrap().is_none());
+    assert!(blocks::Entity::find_by_id(c_block).one(&db).await.unwrap().is_none());
+
+    // A is still in the trash and restores normally.
+    assert_eq!(list_archived_documents(&db, user, ws.id).await.unwrap().len(), 1);
+    restore_document(&db, user, a.id).await.unwrap();
+    assert!(list_archived_documents(&db, user, ws.id).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn trash_is_scoped_to_the_owner() {
+    let db = test_db().await;
+    let (owner, ws) = seed_workspace(&db).await;
+    let (intruder, _) = seed_workspace(&db).await;
+    let doc = create_document(&db, owner, ws.id, "Private", None).await.unwrap();
+    archive_document(&db, owner, doc.id).await.unwrap();
+
+    assert!(list_archived_documents(&db, intruder, ws.id).await.is_err());
+    assert!(restore_document(&db, intruder, doc.id).await.is_err());
+    assert!(delete_document_permanently(&db, intruder, doc.id).await.is_err());
+    assert!(get_owned_document(&db, owner, doc.id).await.unwrap().is_archived);
+}
+
+#[tokio::test]
 async fn moving_pages_and_cycle_protection() {
     let db = test_db().await;
     let (user, ws) = seed_workspace(&db).await;

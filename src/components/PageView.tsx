@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { api, type Doc } from "../api";
+import { registerFlusher, trackSave } from "../pendingSaves";
 import { Editor, type SaveStatus } from "./Editor";
 
 const TITLE_SAVE_DELAY_MS = 400;
@@ -25,11 +26,19 @@ export function PageView({ doc, onTitleChange, onError }: PageViewProps) {
     const value = pendingTitle.current;
     if (value === null) return;
     pendingTitle.current = null;
-    api.updateDocumentTitle(doc.id, value).catch(onError);
+    trackSave(api.updateDocumentTitle(doc.id, value)).catch(onError);
   };
 
-  // Save a pending title when switching pages.
-  useEffect(() => () => flushTitle(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Save a pending title when switching pages or closing the window.
+  const flushRef = useRef(flushTitle);
+  flushRef.current = flushTitle;
+  useEffect(() => {
+    const unregister = registerFlusher(() => flushRef.current());
+    return () => {
+      unregister();
+      flushRef.current();
+    };
+  }, []);
 
   // New, untitled pages start with the cursor in the title.
   useEffect(() => {
