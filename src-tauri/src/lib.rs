@@ -24,6 +24,9 @@ pub fn run() {
             commands::update_document_title,
             commands::archive_document,
             commands::move_document,
+            commands::list_archived_documents,
+            commands::restore_document,
+            commands::delete_document_permanently,
             commands::get_document_blocks,
             commands::save_document_blocks,
         ])

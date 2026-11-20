@@ -100,3 +100,38 @@ pub async fn move_document(
     let user_id = session.require_user()?;
     Ok(document_service::move_document(db.inner(), user_id, id, parent_id).await?.into())
 }
+
+/// Pages in the trash (archived), most recently deleted first.
+#[tauri::command]
+pub async fn list_archived_documents(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    workspace_id: Uuid,
+) -> AppResult<Vec<DocumentResponse>> {
+    let user_id = session.require_user()?;
+    let docs = document_service::list_archived_documents(db.inner(), user_id, workspace_id).await?;
+    Ok(docs.into_iter().map(Into::into).collect())
+}
+
+/// Restores the page and its nested pages; returns the restored pages.
+#[tauri::command]
+pub async fn restore_document(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+) -> AppResult<Vec<DocumentResponse>> {
+    let user_id = session.require_user()?;
+    let docs = document_service::restore_document(db.inner(), user_id, id).await?;
+    Ok(docs.into_iter().map(Into::into).collect())
+}
+
+/// Permanently deletes a trashed page and its nested pages; returns the deleted IDs.
+#[tauri::command]
+pub async fn delete_document_permanently(
+    db: State<'_, DatabaseConnection>,
+    session: State<'_, Session>,
+    id: Uuid,
+) -> AppResult<Vec<Uuid>> {
+    let user_id = session.require_user()?;
+    document_service::delete_document_permanently(db.inner(), user_id, id).await
+}

@@ -15,7 +15,8 @@ src/                     Frontend: React + TypeScript + BlockNote
   App.tsx                Shell: loads workspace + pages, owns selection
   components/            Sidebar (page tree), PageView (title), Editor (BlockNote + autosave + / menu)
   editorSchema.tsx       BlockNote schema: default blocks + custom blocks (pageLink)
-  pagesContext.ts        Page list + navigation for components inside the editor
+  pagesContext.ts        Page list, navigation, trash/restore for components inside the editor
+  pendingSaves.ts        Flush-on-close registry for debounced saves
 src-tauri/
   src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
   src/session.rs         Session (signed-in user) — commands take the user from here
@@ -85,10 +86,11 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 - Commands return response DTOs (`*Response`), not raw entity models.
 - IDs are UUID v4, generated in Rust.
 - Keep commands thin. Logic belongs in `services/`.
+- Keep `services/`, `entities/` and `db/` free of Tauri types. A self-hosted web server (ROADMAP Phase 6) will reuse them behind HTTP endpoints, so the user ID must always arrive as a parameter.
 
 ## Gotchas
 
 - Keep the npm `@tauri-apps/api` minor version in line with the Rust `tauri` crate (both 2.11 now). The Tauri CLI warns about a mismatch.
-- Page edits autosave after 600 ms (titles after 400 ms). Edits in the last fraction of a second before the window closes can be lost (see ROADMAP).
+- Page edits autosave after 600 ms (titles after 400 ms). Anything with a debounced save must use `registerFlusher`/`trackSave` from `src/pendingSaves.ts` so it is flushed when the window closes.
 - In-memory SQLite (`sqlite::memory:`) is forced to a single connection, because each connection would otherwise get its own empty database.
 - The dev environment is Windows. The cargo-make scripts use PowerShell commands.
