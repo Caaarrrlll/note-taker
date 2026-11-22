@@ -1,24 +1,10 @@
-use serde::Serialize;
 use tauri::State;
-use uuid::Uuid;
 
-use note_core::entities::workspaces;
+use note_core::api::WorkspaceResponse;
 use note_core::error::AppResult;
 use note_core::services::workspace_service;
 use crate::spaces::Spaces;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkspaceResponse {
-    pub id: Uuid,
-    pub name: String,
-}
-
-impl From<workspaces::Model> for WorkspaceResponse {
-    fn from(m: workspaces::Model) -> Self {
-        Self { id: m.id, name: m.name }
-    }
-}
 
 #[tauri::command]
 pub async fn list_workspaces(

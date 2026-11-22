@@ -111,3 +111,49 @@ jobs:
         env:
           TEST_DATABASE_URL: ${{ matrix.url }}
         run: cargo test -p note-core --lib
+
+  docker:
+    name: docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: note-taker:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the container
+        run: |
+          # Plain HTTP here, so the session cookie can't be Secure.
+          docker run --detach --name notes --publish 8080:8080 --env COOKIE_SECURE=false note-taker:ci
+
+          for attempt in $(seq 1 30); do
+              if curl --silent --fail http://localhost:8080/healthz; then
+                  break
+              fi
+              sleep 1
+          done
+
+          api_headers=(--header "X-Requested-With: note-taker" --header "Content-Type: application/json")
+
+          echo "First-run setup"
+          curl --silent --fail --cookie-jar cookies "${api_headers[@]}" \
+              --data '{"email":"ci@example.com","displayName":"CI","password":"ci-password-123"}' \
+              http://localhost:8080/api/auth/setup
+
+          echo "Authenticated command"
+          curl --silent --fail --cookie cookies "${api_headers[@]}" --data '{}' \
+              http://localhost:8080/api/list_workspaces | grep --quiet '"name"'
+
+          echo "Web app served"
+          curl --silent --fail http://localhost:8080/ | grep --quiet '<div id="root">'
+
+          echo "Built-in healthcheck"
+          docker exec notes /app/note-server healthcheck
+      - name: Container logs
+        if: always()
+        run: docker logs notes || true

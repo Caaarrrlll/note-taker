@@ -1,6 +1,6 @@
 # Note Taker: Agent Guide
 
-A Notion-style, block-based note-taking **desktop app**. Built with Tauri v2 (Rust backend, web frontend) and SeaORM.
+A Notion-style, block-based note-taking app: a **desktop app** (Tauri v2) and a self-hostable **web app** (`note-server`, one container), sharing one Rust core (SeaORM) and one React frontend.
 
 Storage is a **local SQLite file by default**, with no setup. Users can optionally **connect to an existing PostgreSQL or MySQL/MariaDB server** instead. The app never starts or manages database servers itself. It only connects to them.
 
@@ -15,18 +15,23 @@ web/                     Frontend: React + TypeScript + BlockNote (Vite root; bu
   src/api.ts             Typed wrappers for every Tauri command (keep in sync with commands/); `spaceApi(spaceId)` binds note commands to a space
   src/App.tsx            Space list, switcher state (Ctrl+1–9), space dialogs
   src/components/SpaceView.tsx  One space: workspace + pages, selection, trash (remounted per space)
-  src/components/        Sidebar (page tree), PageView (title), Editor (BlockNote + autosave + / menu)
+  src/components/        Sidebar (page tree + space switcher), PageView (title), Editor (BlockNote + autosave + / menu)
+  src/components/AuthGate.tsx   Web only: first-run setup, sign-in, registration
   src/editorSchema.tsx   BlockNote schema: default blocks + custom blocks (pageLink)
   src/pagesContext.ts    Page list, navigation, trash/restore for components inside the editor
   src/pendingSaves.ts    Flush-on-close registry for debounced saves
-Cargo.toml               Cargo workspace (D12): members crates/note-core, apps/desktop; shared dependency versions
+Cargo.toml               Cargo workspace (D12): members crates/note-core, crates/note-server, apps/desktop; shared dependency versions
 crates/note-core/        Core library: everything that touches the database (no Tauri, no HTTP)
+  src/api.rs             Response DTOs shared by desktop commands and note-server (same JSON everywhere)
   src/error.rs           AppError, serialized to the frontend as { kind, message }
   src/services/          Business logic + queries; generic over `ConnectionTrait`
   src/services/tests.rs  Integration tests (in-memory SQLite by default)
   src/entities/          SeaORM entity models (users, workspaces, documents, blocks)
   src/db/mod.rs          DbConfig (env + SQLite fallback) and connect() (also runs migrations)
   src/db/migrations/     SeaORM migrations, named mYYYYMMDD_NNNNNN_description.rs
+crates/note-server/      Web server (axum): POST /api/<command> mirrors the Tauri commands; /api/auth/*; serves web/dist
+  src/lib.rs             Router, auth (cookie sessions, CSRF header, login rate limit), command dispatch
+  src/tests.rs           HTTP integration tests
 apps/desktop/            Desktop app (Tauri shell), depends on note-core
   src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
   src/spaces.rs          Spaces: spaces.json + one lazily opened SQLite pool (and local user) per space
@@ -34,7 +39,9 @@ apps/desktop/            Desktop app (Tauri shell), depends on note-core
   tauri.conf.json        Tauri config (frontendDist = ../../web/dist)
   capabilities/          Tauri v2 permission sets
 target/                  Build output for the whole workspace (installers in target/release/bundle/)
-Makefile.toml            cargo-make tasks (dev, build, test, clean, ...)
+Dockerfile               Web server image (web build + note-server); deploy/unraid/ has the Unraid template
+docs/self-hosting.md     Running the web server: config, reverse proxy, backups
+Makefile.toml            cargo-make tasks (dev, build, test, clean, server, dev-web, ...)
 .env.example             Optional local config; copy to .env
 ```
 
@@ -55,6 +62,9 @@ cargo make dev                    # = cargo tauri dev; starts Vite too (local SQ
 npm run typecheck                 # frontend type check
 cargo make bundle                 # = npm run tauri build: installers for this OS (target/release/bundle/)
 cargo make test                   # = cargo test --workspace (backend tests on in-memory SQLite)
+cargo make build-web              # web (browser) build into web/dist
+cargo make server                 # note-server on :8080 (data in ./data, serves web/dist, plain-HTTP cookies)
+cargo make dev-web                # web dev server on :1420, proxying /api to cargo make server
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
@@ -83,9 +93,10 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 
 ## Conventions
 
-- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<Spaces>` + `space_id: String`; `spaces.open(&space_id)` gives the space's `db` and `user_id`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then a wrapper in `web/src/api.ts`.
+- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<Spaces>` + `space_id: String`; `spaces.open(&space_id)` gives the space's `db` and `user_id`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then the same command in `note-server`'s `dispatch` (same name and argument names), then a wrapper in `web/src/api.ts`. The frontend uses one wrapper for both targets.
 - **Ownership:** never accept a user/owner ID from the frontend. Load documents with `get_owned_document` and workspaces with `get_owned_workspace`. Another user's data is reported as NotFound.
-- **DTOs:** response structs use `#[serde(rename_all = "camelCase")]`.
+- **DTOs:** response structs live in `note_core::api` and use `#[serde(rename_all = "camelCase")]`.
+- **Web vs desktop frontend:** `IS_WEB` (`import.meta.env.MODE === "web"`) switches the transport and hides desktop-only UI (space management, file pickers). Don't call Tauri APIs on the web path.
 - **Migrations:** before the first release, existing migrations may still be edited (reset local DBs afterwards). After release, never edit an applied migration. Add a new one and register it in `db/migrations/mod.rs` in order.
 - **Errors:** services and commands return `AppResult<T>` (`error.rs`). Don't hide real DB errors as "not found".
 - Commands return response DTOs (`*Response`), not raw entity models.

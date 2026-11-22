@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { errorMessage, spacesApi, type Space } from "./api";
+import { errorMessage, IS_WEB, spacesApi, type Space, type User } from "./api";
 import { storage } from "./hooks";
+import { AuthGate } from "./components/AuthGate";
 import { SpaceDialog } from "./components/SpaceDialog";
 import { SpaceView } from "./components/SpaceView";
 
@@ -9,8 +10,18 @@ const ACTIVE_SPACE_KEY = "activeSpaceId";
 
 type Dialog = { kind: "new" } | { kind: "settings"; space: Space } | null;
 
-/** Space list, switcher state and space dialogs; the active space renders below. */
 export default function App() {
+  if (!IS_WEB) return <Spaces />;
+  return <AuthGate>{(user, signOut) => <Spaces key={user.id} account={{ user, signOut }} />}</AuthGate>;
+}
+
+interface SpacesProps {
+  /** Web only: the signed-in account. */
+  account?: { user: User; signOut: () => void };
+}
+
+/** Space list, switcher state and space dialogs; the active space renders below. */
+function Spaces({ account }: SpacesProps) {
   const [spaces, setSpaces] = useState<Space[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -89,8 +100,12 @@ export default function App() {
           spaces,
           active,
           onSwitch: switchTo,
-          onNew: () => setDialog({ kind: "new" }),
-          onSettings: () => setDialog({ kind: "settings", space: active }),
+          ...(account
+            ? { account: { label: account.user.email, onSignOut: account.signOut } }
+            : {
+                onNew: () => setDialog({ kind: "new" }),
+                onSettings: () => setDialog({ kind: "settings", space: active }),
+              }),
         }}
       />
       {dialog && (

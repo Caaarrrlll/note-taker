@@ -81,7 +81,6 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
 }
 
 /// Create a password-protected account.
-#[allow(dead_code)] // used by the login UI (not built yet)
 pub async fn register<C: ConnectionTrait>(
     db: &C,
     email: &str,
@@ -125,7 +124,6 @@ pub async fn register<C: ConnectionTrait>(
 }
 
 /// Check credentials. The local user can never log in with a password.
-#[allow(dead_code)] // used by the login UI (not built yet)
 pub async fn login<C: ConnectionTrait>(db: &C, email: &str, password: &str) -> AppResult<users::Model> {
     let user = users::Entity::find()
         .filter(users::Column::Email.eq(normalize_email(email)))
@@ -135,6 +133,27 @@ pub async fn login<C: ConnectionTrait>(db: &C, email: &str, password: &str) -> A
 
     match user {
         Some(u) if u.password_hash.as_deref().is_some_and(|h| verify_password(password, h)) => Ok(u),
-        _ => Err(AppError::InvalidCredentials),
+        Some(_) => Err(AppError::InvalidCredentials),
+        None => {
+            // Spend the same time as a real check, so response timing doesn't
+            // reveal which email addresses have accounts.
+            verify_password(password, dummy_hash());
+            Err(AppError::InvalidCredentials)
+        }
     }
+}
+
+fn dummy_hash() -> &'static str {
+    static HASH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    HASH.get_or_init(|| hash_password("not-a-real-password").unwrap_or_default())
+}
+
+/// Whether any password account exists (the passwordless local user doesn't
+/// count). The web server uses this for first-run setup.
+pub async fn has_accounts<C: ConnectionTrait>(db: &C) -> AppResult<bool> {
+    Ok(users::Entity::find()
+        .filter(users::Column::IsLocal.eq(false))
+        .one(db)
+        .await?
+        .is_some())
 }

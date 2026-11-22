@@ -1,0 +1,10 @@
+# Keep the build context small: build output, dependencies and local files
+.git
+target
+node_modules
+web/dist
+apps/desktop/gen
+.env
+.env.*
+.vscode
+.serena

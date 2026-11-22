@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+  Unraid template for the Note Taker web server.
+  Install: copy this file to /boot/config/plugins/dockerMan/templates-user/my-note-taker.xml,
+  then Docker > Add Container > Template: note-taker. See docs/self-hosting.md.
+-->
+<Container version="2">
+  <Name>note-taker</Name>
+  <Repository>ghcr.io/caaarrrlll/note-taker:latest</Repository>
+  <Registry>https://github.com/Caaarrrlll/note-taker/pkgs/container/note-taker</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Caaarrrlll/note-taker/issues</Support>
+  <Project>https://github.com/Caaarrrlll/note-taker</Project>
+  <Overview>Block-based note-taking (Notion-style pages, nested pages, trash) in the browser. Stores notes in SQLite under /data by default, or in PostgreSQL/MariaDB via DATABASE_URL. The first visitor creates the first account; registration is closed after that. Put it behind your HTTPS reverse proxy before exposing it outside your network.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Icon>https://raw.githubusercontent.com/Caaarrrlll/note-taker/master/apps/desktop/icons/128x128.png</Icon>
+  <ExtraParams>--user 99:100</ExtraParams>
+  <Config Name="Web UI port" Target="8080" Default="8080" Mode="tcp" Description="HTTP port of the web app and API." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/note-taker" Mode="rw" Description="SQLite database (when DATABASE_URL is empty). Back this folder up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/note-taker</Config>
+  <Config Name="DATABASE_URL" Target="DATABASE_URL" Default="" Mode="" Description="Optional. postgres://USER:PASSWORD@HOST:5432/DB or mariadb://USER:PASSWORD@HOST:3306/DB. Empty = SQLite in /data. The database must exist; tables are created automatically." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="REGISTRATION" Target="REGISTRATION" Default="closed" Mode="" Description="closed: only the first-run account. open: anyone who can reach the server can sign up." Type="Variable" Display="always" Required="false" Mask="false">closed</Config>
+  <Config Name="COOKIE_SECURE" Target="COOKIE_SECURE" Default="true" Mode="" Description="Keep true when served over HTTPS (reverse proxy). Set false only to try it over plain HTTP on your LAN." Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="SESSION_TTL_DAYS" Target="SESSION_TTL_DAYS" Default="30" Mode="" Description="How long a sign-in lasts." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+</Container>

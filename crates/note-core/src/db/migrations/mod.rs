@@ -4,6 +4,7 @@ mod m20260909_000001_create_users;
 mod m20260909_000002_create_workspaces;
 mod m20260909_000003_create_documents;
 mod m20260909_000004_create_blocks;
+mod m20261122_000005_create_sessions;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260909_000002_create_workspaces::Migration),
             Box::new(m20260909_000003_create_documents::Migration),
             Box::new(m20260909_000004_create_blocks::Migration),
+            Box::new(m20261122_000005_create_sessions::Migration),
         ]
     }
 }

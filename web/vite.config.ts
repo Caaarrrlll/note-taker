@@ -8,6 +8,11 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // `npm run dev:web`: forward API calls to a local note-server (cargo run -p note-server).
+    proxy: {
+      "/api": "http://localhost:8080",
+      "/healthz": "http://localhost:8080",
+    },
   },
   build: {
     target: "es2022",

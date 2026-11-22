@@ -8,7 +8,9 @@
     "build": "tsc --noEmit -p web && vite build web",
     "typecheck": "tsc --noEmit -p web",
     "preview": "vite preview web",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev:web": "vite web --mode web",
+    "build:web": "tsc --noEmit -p web && vite build web --mode web"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.5",

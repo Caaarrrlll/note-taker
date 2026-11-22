@@ -26,3 +26,6 @@ Thumbs.db
 desktop.ini
 # Serena (MCP tool) project cache
 .serena/
+
+# Local note-server data (cargo make server)
+/data/

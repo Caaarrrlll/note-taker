@@ -210,38 +210,38 @@ Run the same app in a browser, served from one container on a home server (e.g. 
 
   - [x] Step 1: Cargo workspace at the repo root + `crates/note-core` (entities, migrations, services, errors, tests). `src-tauri` depends on it; build output moved to the root `target/`.
   - [x] Step 2: move `src-tauri` to `apps/desktop` and `src` to `web/` (Vite root is `web/`, one `package.json` at the repo root)
-  - [ ] Step 3: add `crates/note-server`
-- [ ] Shared API types: request and response structs live in `note-core` (or a small `note-api` crate), used by the server and by the desktop's remote client, so both sides can't drift. Generate the TypeScript types for `web/` from them (e.g. `ts-rs` or `specta`) instead of writing them twice.
-- [ ] Web server binary (`note-server`, using axum): JSON endpoints mirroring the Tauri commands (D7), serving the built frontend as static files on the same port
-- [ ] `src/api.ts`: choose the transport at build time (`invoke` in the desktop app, `fetch` in the web build). Components stay unchanged.
-- [ ] Web build of the frontend: no Tauri-only APIs in the browser (e.g. the window-close hook becomes `beforeunload` / `visibilitychange` + `navigator.sendBeacon`)
-- [ ] Health endpoint (`/healthz`) for container health checks
+  - [x] Step 3: add `crates/note-server`
+- [~] Shared API types: request and response structs live in `note-core` (or a small `note-api` crate), used by the server and by the desktop's remote client, so both sides can't drift. Generate the TypeScript types for `web/` from them (e.g. `ts-rs` or `specta`) instead of writing them twice. _(response types live in `note_core::api`; TypeScript types are still written by hand)_
+- [x] Web server binary (`note-server`, using axum): JSON endpoints mirroring the Tauri commands (D7), serving the built frontend as static files on the same port _(`POST /api/<command>` with the same names and camelCase JSON as the Tauri commands)_
+- [x] `src/api.ts`: choose the transport at build time (`invoke` in the desktop app, `fetch` in the web build). Components stay unchanged. _(`vite --mode web` builds the web target)_
+- [x] Web build of the frontend: no Tauri-only APIs in the browser (e.g. the window-close hook becomes `beforeunload` / `visibilitychange` + `navigator.sendBeacon`) _(`visibilitychange` flush + a `beforeunload` prompt while saves are in flight)_
+- [x] Health endpoint (`/healthz`) for container health checks _(plus `note-server healthcheck` for the container)_
 
 **Authentication** (required: the app will be reachable over the network)
-- [ ] Login and register screens, using the existing `auth_service` (argon2)
-- [ ] Sessions: random session IDs in a DB `sessions` table, sent as `HttpOnly`, `Secure`, `SameSite=Lax` cookies, with expiry and logout
-- [ ] Per-request user: replace the app-wide `Session` with a user from the session cookie. Services already take `user_id` and check ownership.
-- [ ] First-run setup: the first visitor creates the admin account. After that, registration is closed by default (`REGISTRATION=closed|invite|open`).
+- [x] Login and register screens, using the existing `auth_service` (argon2)
+- [x] Sessions: random session IDs in a DB `sessions` table, sent as `HttpOnly`, `Secure`, `SameSite=Lax` cookies, with expiry and logout _(only a SHA-256 hash of each token is stored)_
+- [x] Per-request user: replace the app-wide `Session` with a user from the session cookie. Services already take `user_id` and check ownership.
+- [x] First-run setup: the first visitor creates the admin account. After that, registration is closed by default (`REGISTRATION=closed|invite|open`). _(first account via setup; `REGISTRATION=closed|open`; no invites or admin role yet)_
 - [ ] **Device tokens** for desktop clients in remote mode (D8): signing in from the desktop app creates a long, random token stored hashed in a `device_tokens` table (user, device name, created, last used), sent as `Authorization: Bearer`. The app keeps it in the OS keychain. A "Devices" page lists them and revokes one without touching the others (e.g. a lost or returned work laptop). Browser sessions keep using cookies.
-- [ ] Rate-limit login attempts. Constant-time handling of unknown emails.
-- [ ] CSRF protection for state-changing requests (SameSite cookies + an origin check)
+- [x] Rate-limit login attempts. Constant-time handling of unknown emails. _(10 failures per email / 15 min; unknown emails get a dummy hash check)_
+- [x] CSRF protection for state-changing requests (SameSite cookies + an origin check) _(required `X-Requested-With: note-taker` header + SameSite=Lax; no CORS)_
 - [ ] Change password; an admin can reset passwords and disable users
 - [ ] Later: optional OIDC / reverse-proxy auth (Authelia, Authentik), common on Unraid setups
 
 **Container**
-- [ ] Multi-stage `Dockerfile`: Node builds the frontend, Rust builds `note-server`, and a slim runtime image (non-root user) contains just the binary and static files
-- [ ] Configuration via environment variables: `DATABASE_URL` (defaults to SQLite at `/data/notes.db`), `PORT`, `PUBLIC_URL`, `REGISTRATION`, `SESSION_TTL`
-- [ ] `/data` volume for the SQLite database (and attachments later)
-- [ ] GitHub Actions: build and push the image to GHCR (`ghcr.io/caaarrrlll/note-taker`) on version tags, for `linux/amd64` (plus `arm64` if cheap)
-- [ ] Unraid Community Applications template (XML): port, `/mnt/user/appdata/note-taker` → `/data`, environment variables
-- [ ] Docs: running behind a reverse proxy with HTTPS (Caddy / SWAG / Nginx Proxy Manager / Traefik), and trusting `X-Forwarded-*` headers only from the proxy
-- [ ] Docs, network exposure: publish **only** the proxy's HTTPS port. The database stays on the server's private network and its port is never forwarded or published; only `note-server` connects to it, with its own database user. Clients (browser and desktop remote mode) need nothing but HTTPS, so they work from networks that block everything else.
-- [ ] Docs: backups (copy the SQLite file, or use a Postgres/MariaDB container on the same server via `DATABASE_URL`)
+- [x] Multi-stage `Dockerfile`: Node builds the frontend, Rust builds `note-server`, and a slim runtime image (non-root user) contains just the binary and static files
+- [x] Configuration via environment variables: `DATABASE_URL` (defaults to SQLite at `/data/notes.db`), `PORT`, `PUBLIC_URL`, `REGISTRATION`, `SESSION_TTL` _(`SESSION_TTL_DAYS`, `COOKIE_SECURE`, `DATA_DIR`; `PUBLIC_URL` turned out unnecessary)_
+- [x] `/data` volume for the SQLite database (and attachments later)
+- [x] GitHub Actions: build and push the image to GHCR (`ghcr.io/caaarrrlll/note-taker`) on version tags, for `linux/amd64` (plus `arm64` if cheap) _(`release.yml` on `v*` tags, linux/amd64 only; first real run on the next tag)_
+- [x] Unraid Community Applications template (XML): port, `/mnt/user/appdata/note-taker` → `/data`, environment variables _(`deploy/unraid/note-taker.xml`, runs as 99:100)_
+- [x] Docs: running behind a reverse proxy with HTTPS (Caddy / SWAG / Nginx Proxy Manager / Traefik), and trusting `X-Forwarded-*` headers only from the proxy _(`docs/self-hosting.md`; the server reads no `X-Forwarded-*` headers)_
+- [x] Docs, network exposure: publish **only** the proxy's HTTPS port. The database stays on the server's private network and its port is never forwarded or published; only `note-server` connects to it, with its own database user. Clients (browser and desktop remote mode) need nothing but HTTPS, so they work from networks that block everything else.
+- [x] Docs: backups (copy the SQLite file, or use a Postgres/MariaDB container on the same server via `DATABASE_URL`)
 
 **Tests**
-- [ ] HTTP API integration tests (auth required, ownership enforced, cookie flags, device token create/use/revoke)
+- [~] HTTP API integration tests (auth required, ownership enforced, cookie flags, device token create/use/revoke) _(9 tests in `note-server`; device tokens not built yet)_
 - [ ] Desktop remote-mode tests against a test server: open, edit and save a page in a remote space; a revoked token gives a clear "signed out" state
-- [ ] CI: build the container image on every PR, and smoke-test `/healthz` and login
+- [x] CI: build the container image on every PR, and smoke-test `/healthz` and login _(`docker` job: build, then smoke-test health, setup, an authenticated call and the web app)_
 
 ## Phase 8: Going public
 

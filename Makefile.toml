@@ -68,3 +68,21 @@ script = '''
 npm run tauri icon apps/desktop/icons/app-icon.svg
 Remove-Item -Recurse -Force apps/desktop/icons/android, apps/desktop/icons/ios -ErrorAction SilentlyContinue
 '''
+
+[tasks.server]
+description = "Run note-server locally on :8080 (data in ./data; serves web/dist from `cargo make build-web`)"
+env = { COOKIE_SECURE = "false" }
+command = "cargo"
+args = ["run", "--package", "note-server"]
+
+[tasks.build-web]
+description = "Build the web (browser) version of the frontend into web/dist"
+script = '''
+npm run build:web
+'''
+
+[tasks.dev-web]
+description = "Web frontend dev server on :1420, proxying /api to `cargo make server`"
+script = '''
+npm run dev:web
+'''

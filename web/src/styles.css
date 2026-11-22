@@ -684,3 +684,37 @@ button:disabled {
 .text-button.danger {
   color: var(--danger);
 }
+
+/* ------------------------------------------------------------ web sign-in */
+
+.space-menu-account {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 16px;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(380px, 100%);
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--sidebar-bg);
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 20px;
+}
