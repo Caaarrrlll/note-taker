@@ -8,7 +8,6 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 
-import { api } from "../api";
 import { PageIcon, schema, type AppPartialBlock } from "../editorSchema";
 import { useColorScheme } from "../hooks";
 import { usePages } from "../pagesContext";
@@ -26,6 +25,7 @@ interface EditorProps {
 
 /** Loads a page's blocks, then mounts the editor with them. */
 export function Editor({ documentId, onError, onStatus }: EditorProps) {
+  const { api } = usePages();
   const [initial, setInitial] = useState<AppPartialBlock[] | null>(null);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export function Editor({ documentId, onError, onStatus }: EditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [documentId, onError]);
+  }, [api, documentId, onError]);
 
   if (initial === null) return <div className="editor-loading" />;
   return (
@@ -89,7 +89,7 @@ function LoadedEditor({ documentId, initialContent, onError, onStatus }: LoadedE
     onStatus("saving");
     queue.current = trackSave(
       queue.current
-        .then(() => api.saveDocumentBlocks(documentId, blocks))
+        .then(() => pages.api.saveDocumentBlocks(documentId, blocks))
         .then(
           () => onStatus(timer.current === undefined ? "saved" : "unsaved"),
           (e) => {

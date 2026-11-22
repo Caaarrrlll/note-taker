@@ -1,168 +1,107 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { api, errorMessage, type Doc, type Workspace } from "./api";
+import { errorMessage, spacesApi, type Space } from "./api";
 import { storage } from "./hooks";
-import { PagesContext, type PagesContextValue } from "./pagesContext";
-import { Sidebar } from "./components/Sidebar";
-import { PageView } from "./components/PageView";
-import { Trash } from "./components/Trash";
+import { SpaceDialog } from "./components/SpaceDialog";
+import { SpaceView } from "./components/SpaceView";
 
-const LAST_PAGE_KEY = "lastPageId";
+const ACTIVE_SPACE_KEY = "activeSpaceId";
 
-const byCreatedAt = (a: Doc, b: Doc) => Date.parse(a.createdAt) - Date.parse(b.createdAt);
+type Dialog = { kind: "new" } | { kind: "settings"; space: Space } | null;
 
+/** Space list, switcher state and space dialogs; the active space renders below. */
 export default function App() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [docs, setDocs] = useState<Doc[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [spaces, setSpaces] = useState<Space[] | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<Dialog>(null);
   const [error, setError] = useState<string | null>(null);
-  const [trashOpen, setTrashOpen] = useState(false);
-
-  const reportError = useCallback((e: unknown) => setError(errorMessage(e)), []);
-
-  // Initial load: the local user's first workspace and its pages.
-  useEffect(() => {
-    (async () => {
-      try {
-        const [ws] = await api.listWorkspaces();
-        if (!ws) throw new Error("No workspace found");
-        const list = await api.listDocuments(ws.id);
-        setWorkspace(ws);
-        setDocs(list);
-        const last = storage.get(LAST_PAGE_KEY);
-        setSelectedId(list.find((d) => d.id === last)?.id ?? list[0]?.id ?? null);
-      } catch (e) {
-        reportError(e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [reportError]);
 
   useEffect(() => {
-    if (selectedId) storage.set(LAST_PAGE_KEY, selectedId);
-  }, [selectedId]);
-
-  const createDocument = useCallback(
-    async (parentId: string | null): Promise<Doc | null> => {
-      if (!workspace) return null;
-      try {
-        const doc = await api.createDocument(workspace.id, "", parentId);
-        setDocs((prev) => [...prev, doc]);
-        return doc;
-      } catch (e) {
-        reportError(e);
-        return null;
-      }
-    },
-    [workspace, reportError],
-  );
-
-  const createPage = useCallback(
-    async (parentId: string | null) => {
-      const doc = await createDocument(parentId);
-      if (doc) setSelectedId(doc.id);
-    },
-    [createDocument],
-  );
-
-  const archivePage = useCallback(
-    async (id: string) => {
-      try {
-        const archived = new Set(await api.archiveDocument(id));
-        setDocs((prev) => {
-          const remaining = prev.filter((d) => !archived.has(d.id));
-          setSelectedId((sel) => (sel && archived.has(sel) ? (remaining[0]?.id ?? null) : sel));
-          return remaining;
-        });
-      } catch (e) {
-        reportError(e);
-      }
-    },
-    [reportError],
-  );
-
-  // Put restored pages back into the list (in creation order, like a fresh load).
-  const addRestored = useCallback((restored: Doc[]) => {
-    const ids = new Set(restored.map((d) => d.id));
-    setDocs((prev) => [...prev.filter((d) => !ids.has(d.id)), ...restored].sort(byCreatedAt));
+    spacesApi.list().then(
+      (list) => {
+        setSpaces(list);
+        const last = storage.get(ACTIVE_SPACE_KEY);
+        setActiveId(list.find((s) => s.id === last)?.id ?? list[0]?.id ?? null);
+      },
+      (e) => setError(errorMessage(e)),
+    );
   }, []);
 
-  const restorePage = useCallback(
-    async (id: string, opts?: { quiet?: boolean }) => {
-      try {
-        addRestored(await api.restoreDocument(id));
-      } catch (e) {
-        if (!opts?.quiet) reportError(e);
-      }
-    },
-    [addRestored, reportError],
-  );
-
-  // Local title update (PageView persists it); keeps the sidebar in sync while typing.
-  const setTitle = useCallback((id: string, title: string) => {
-    setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
+  const switchTo = useCallback((id: string) => {
+    setActiveId(id);
+    storage.set(ACTIVE_SPACE_KEY, id);
   }, []);
 
-  const selected = docs.find((d) => d.id === selectedId) ?? null;
+  // Ctrl+1 … Ctrl+9 switch spaces.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
+      const index = Number(e.key) - 1;
+      const space = spaces?.[index];
+      if (Number.isInteger(index) && space) {
+        e.preventDefault();
+        switchTo(space.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [spaces, switchTo]);
 
-  const pagesContext = useMemo<PagesContextValue>(
-    () => ({
-      docsById: new Map(docs.map((d) => [d.id, d])),
-      openPage: setSelectedId,
-      createSubpage: (parentId) => createDocument(parentId),
-      trashPage: archivePage,
-      restorePage,
-    }),
-    [docs, createDocument, archivePage, restorePage],
-  );
+  const active = spaces?.find((s) => s.id === activeId) ?? null;
+
+  if (error) {
+    return (
+      <div className="empty-state" role="alert">
+        <p>Couldn't load your spaces: {error}</p>
+      </div>
+    );
+  }
+  if (!spaces || !active) return null;
+
+  const saved = (space: Space) => {
+    setSpaces((prev) => {
+      const list = prev ?? [];
+      return list.some((s) => s.id === space.id) ? list.map((s) => (s.id === space.id ? space : s)) : [...list, space];
+    });
+    if (dialog?.kind === "new") {
+      switchTo(space.id);
+      setDialog(null);
+    } else if (dialog?.kind === "settings") {
+      setDialog({ kind: "settings", space });
+    }
+  };
+
+  const removed = (id: string) => {
+    const remaining = spaces.filter((s) => s.id !== id);
+    setSpaces(remaining);
+    if (id === activeId && remaining[0]) switchTo(remaining[0].id);
+    setDialog(null);
+  };
 
   return (
-    <PagesContext.Provider value={pagesContext}>
-      <div className="app">
-        <Sidebar
-          workspaceName={workspace?.name ?? ""}
-          docs={docs}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onCreate={createPage}
-          onArchive={archivePage}
-          onOpenTrash={() => setTrashOpen(true)}
+    <>
+      <SpaceView
+        // Remount per space: pending saves flush, then the new space loads.
+        // The path is part of the key so a moved file reconnects cleanly.
+        key={`${active.id}:${active.path}`}
+        space={active}
+        spaceMenu={{
+          spaces,
+          active,
+          onSwitch: switchTo,
+          onNew: () => setDialog({ kind: "new" }),
+          onSettings: () => setDialog({ kind: "settings", space: active }),
+        }}
+      />
+      {dialog && (
+        <SpaceDialog
+          space={dialog.kind === "settings" ? dialog.space : undefined}
+          canRemove={spaces.length > 1}
+          onSaved={saved}
+          onRemoved={removed}
+          onClose={() => setDialog(null)}
         />
-        <main className="main">
-          {error && (
-            <div className="error-banner" role="alert">
-              <span>{error}</span>
-              <button className="icon-button" onClick={() => setError(null)} aria-label="Dismiss error">
-                ×
-              </button>
-            </div>
-          )}
-          {loading ? null : selected ? (
-            <PageView key={selected.id} doc={selected} onTitleChange={setTitle} onError={reportError} />
-          ) : (
-            <div className="empty-state">
-              <p>No pages yet.</p>
-              <button className="primary-button" onClick={() => createPage(null)} disabled={!workspace}>
-                Create your first page
-              </button>
-            </div>
-          )}
-        </main>
-        {trashOpen && workspace && (
-          <Trash
-            workspaceId={workspace.id}
-            onRestored={(restored, id) => {
-              addRestored(restored);
-              setSelectedId(id);
-              setTrashOpen(false);
-            }}
-            onClose={() => setTrashOpen(false)}
-            onError={reportError}
-          />
-        )}
-      </div>
-    </PagesContext.Provider>
+      )}
+    </>
   );
 }

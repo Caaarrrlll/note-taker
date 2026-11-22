@@ -1,9 +1,11 @@
 import { createContext, useContext } from "react";
 
-import type { Doc } from "./api";
+import type { Doc, SpaceApi } from "./api";
 
 /** Page list + navigation, for components rendered inside the editor. */
 export interface PagesContextValue {
+  /** Note commands for the current space. */
+  api: SpaceApi;
   /** Non-archived pages of the current workspace, by ID. */
   docsById: Map<string, Doc>;
   openPage: (id: string) => void;

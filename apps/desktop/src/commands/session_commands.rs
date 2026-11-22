@@ -1,4 +1,3 @@
-use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
@@ -6,7 +5,7 @@ use uuid::Uuid;
 use note_core::entities::users;
 use note_core::error::AppResult;
 use note_core::services::auth_service;
-use crate::session::Session;
+use crate::spaces::Spaces;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,9 +22,9 @@ impl From<users::Model> for UserResponse {
     }
 }
 
-/// The signed-in user. Fails with kind `unauthenticated` when nobody is signed in.
+/// The space's user (the local user of its database).
 #[tauri::command]
-pub async fn get_current_user(db: State<'_, DatabaseConnection>, session: State<'_, Session>) -> AppResult<UserResponse> {
-    let user_id = session.require_user()?;
-    Ok(auth_service::get_user(db.inner(), user_id).await?.into())
+pub async fn get_current_user(spaces: State<'_, Spaces>, space_id: String) -> AppResult<UserResponse> {
+    let space = spaces.open(&space_id).await?;
+    Ok(auth_service::get_user(&space.db, space.user_id).await?.into())
 }

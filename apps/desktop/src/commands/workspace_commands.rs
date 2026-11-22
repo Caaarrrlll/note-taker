@@ -1,4 +1,3 @@
-use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
@@ -6,7 +5,7 @@ use uuid::Uuid;
 use note_core::entities::workspaces;
 use note_core::error::AppResult;
 use note_core::services::workspace_service;
-use crate::session::Session;
+use crate::spaces::Spaces;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,20 +22,20 @@ impl From<workspaces::Model> for WorkspaceResponse {
 
 #[tauri::command]
 pub async fn list_workspaces(
-    db: State<'_, DatabaseConnection>,
-    session: State<'_, Session>,
+    spaces: State<'_, Spaces>,
+    space_id: String,
 ) -> AppResult<Vec<WorkspaceResponse>> {
-    let user_id = session.require_user()?;
-    let list = workspace_service::list_user_workspaces(db.inner(), user_id).await?;
+    let space = spaces.open(&space_id).await?;
+    let list = workspace_service::list_user_workspaces(&space.db, space.user_id).await?;
     Ok(list.into_iter().map(Into::into).collect())
 }
 
 #[tauri::command]
 pub async fn create_workspace(
-    db: State<'_, DatabaseConnection>,
-    session: State<'_, Session>,
+    spaces: State<'_, Spaces>,
+    space_id: String,
     name: String,
 ) -> AppResult<WorkspaceResponse> {
-    let user_id = session.require_user()?;
-    Ok(workspace_service::create_workspace(db.inner(), user_id, &name).await?.into())
+    let space = spaces.open(&space_id).await?;
+    Ok(workspace_service::create_workspace(&space.db, space.user_id, &name).await?.into())
 }
