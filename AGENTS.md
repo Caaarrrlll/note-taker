@@ -67,7 +67,7 @@ Migrations run automatically on connect. There's no separate migrate step.
 
 - Runtime config comes from environment variables, which are loaded from an optional `.env` through `dotenvy`.
 - `DATABASE_URL` unset: SQLite at `<app_data_dir>/notes.db`. On Windows that's `%APPDATA%\com.caaarrrlll.notetaker\notes.db`.
-- `DATABASE_URL=postgres://…` or `mysql://…` connects to that existing server database. The database must already exist; the app creates the tables.
+- `DATABASE_URL=postgres://…` (or `postgresql://`), `mariadb://…` or `mysql://…` connects to that existing server database. `mariadb://` is rewritten to `mysql://` by `db::driver_url`, because MariaDB uses the MySQL driver. The database must already exist; the app creates the tables.
 - When you add a new setting, add it to `.env.example` with a comment explaining it. Never commit `.env`.
 
 ## Database portability (important)

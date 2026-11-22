@@ -60,9 +60,19 @@ pub fn backend_name(url: &str) -> &'static str {
     }
 }
 
+/// URL in the form the driver accepts. MariaDB speaks the MySQL protocol and
+/// uses the MySQL driver, which only recognises `mysql://`; accept the more
+/// natural `mariadb://` too. (`postgresql://` is already accepted as-is.)
+pub fn driver_url(url: &str) -> String {
+    match url.strip_prefix("mariadb://") {
+        Some(rest) => format!("mysql://{rest}"),
+        None => url.to_string(),
+    }
+}
+
 /// Connect and bring the schema up to date.
 pub async fn connect(config: &DbConfig) -> Result<DatabaseConnection, DbErr> {
-    let mut opts = ConnectOptions::new(config.url.clone());
+    let mut opts = ConnectOptions::new(driver_url(&config.url));
     opts.sqlx_logging(false);
 
     let is_sqlite_memory = config.url.starts_with("sqlite") && config.url.contains(":memory:");
