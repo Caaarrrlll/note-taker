@@ -56,8 +56,11 @@ args = ["test", "--workspace"]
 
 [tasks.bundle]
 description = "Build installers for the current OS (Windows: .msi + .exe; Linux: .deb + AppImage; macOS: .dmg)"
-command = "npm"
-args = ["run", "tauri", "build"]
+# A script (run through a shell), not `command`: on Windows npm is npm.cmd,
+# which cargo-make can't start directly ("program not found").
+script = '''
+npm run tauri build
+'''
 
 [tasks.icons]
 description = "Regenerate all app icons from apps/desktop/icons/app-icon.svg"
