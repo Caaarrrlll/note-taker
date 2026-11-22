@@ -1,0 +1,177 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { errorMessage, spaceApi, type Doc, type Space, type Workspace } from "../api";
+import { storage } from "../hooks";
+import { PagesContext, type PagesContextValue } from "../pagesContext";
+import { Sidebar, type SpaceMenu } from "./Sidebar";
+import { PageView } from "./PageView";
+import { Trash } from "./Trash";
+
+const lastPageKey = (spaceId: string) => `lastPageId:${spaceId}`;
+
+const byCreatedAt = (a: Doc, b: Doc) => Date.parse(a.createdAt) - Date.parse(b.createdAt);
+
+interface SpaceViewProps {
+  space: Space;
+  /** Space switcher shown at the top of the sidebar. */
+  spaceMenu: SpaceMenu;
+}
+
+/** One space: its page tree, editor and trash. Remounted when the space changes. */
+export function SpaceView({ space, spaceMenu }: SpaceViewProps) {
+  const api = useMemo(() => spaceApi(space.id), [space.id]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [docs, setDocs] = useState<Doc[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
+
+  const reportError = useCallback((e: unknown) => setError(errorMessage(e)), []);
+
+  // Initial load: the space's workspace and its pages.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [ws] = await api.listWorkspaces();
+        if (!ws) throw new Error("No workspace found");
+        const list = await api.listDocuments(ws.id);
+        setWorkspace(ws);
+        setDocs(list);
+        const last = storage.get(lastPageKey(space.id));
+        setSelectedId(list.find((d) => d.id === last)?.id ?? list[0]?.id ?? null);
+      } catch (e) {
+        reportError(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [api, space.id, reportError]);
+
+  useEffect(() => {
+    if (selectedId) storage.set(lastPageKey(space.id), selectedId);
+  }, [space.id, selectedId]);
+
+  const createDocument = useCallback(
+    async (parentId: string | null): Promise<Doc | null> => {
+      if (!workspace) return null;
+      try {
+        const doc = await api.createDocument(workspace.id, "", parentId);
+        setDocs((prev) => [...prev, doc]);
+        return doc;
+      } catch (e) {
+        reportError(e);
+        return null;
+      }
+    },
+    [api, workspace, reportError],
+  );
+
+  const createPage = useCallback(
+    async (parentId: string | null) => {
+      const doc = await createDocument(parentId);
+      if (doc) setSelectedId(doc.id);
+    },
+    [createDocument],
+  );
+
+  const archivePage = useCallback(
+    async (id: string) => {
+      try {
+        const archived = new Set(await api.archiveDocument(id));
+        setDocs((prev) => {
+          const remaining = prev.filter((d) => !archived.has(d.id));
+          setSelectedId((sel) => (sel && archived.has(sel) ? (remaining[0]?.id ?? null) : sel));
+          return remaining;
+        });
+      } catch (e) {
+        reportError(e);
+      }
+    },
+    [api, reportError],
+  );
+
+  // Put restored pages back into the list (in creation order, like a fresh load).
+  const addRestored = useCallback((restored: Doc[]) => {
+    const ids = new Set(restored.map((d) => d.id));
+    setDocs((prev) => [...prev.filter((d) => !ids.has(d.id)), ...restored].sort(byCreatedAt));
+  }, []);
+
+  const restorePage = useCallback(
+    async (id: string, opts?: { quiet?: boolean }) => {
+      try {
+        addRestored(await api.restoreDocument(id));
+      } catch (e) {
+        if (!opts?.quiet) reportError(e);
+      }
+    },
+    [api, addRestored, reportError],
+  );
+
+  // Local title update (PageView persists it); keeps the sidebar in sync while typing.
+  const setTitle = useCallback((id: string, title: string) => {
+    setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
+  }, []);
+
+  const selected = docs.find((d) => d.id === selectedId) ?? null;
+
+  const pagesContext = useMemo<PagesContextValue>(
+    () => ({
+      api,
+      docsById: new Map(docs.map((d) => [d.id, d])),
+      openPage: setSelectedId,
+      createSubpage: (parentId) => createDocument(parentId),
+      trashPage: archivePage,
+      restorePage,
+    }),
+    [api, docs, createDocument, archivePage, restorePage],
+  );
+
+  return (
+    <PagesContext.Provider value={pagesContext}>
+      <div className="app">
+        <Sidebar
+          spaceMenu={spaceMenu}
+          docs={docs}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onCreate={createPage}
+          onArchive={archivePage}
+          onOpenTrash={() => setTrashOpen(true)}
+        />
+        <main className="main">
+          {error && (
+            <div className="error-banner" role="alert">
+              <span>{error}</span>
+              <button className="icon-button" onClick={() => setError(null)} aria-label="Dismiss error">
+                ×
+              </button>
+            </div>
+          )}
+          {loading ? null : selected ? (
+            <PageView key={selected.id} doc={selected} onTitleChange={setTitle} onError={reportError} />
+          ) : (
+            <div className="empty-state">
+              <p>No pages yet.</p>
+              <button className="primary-button" onClick={() => createPage(null)} disabled={!workspace}>
+                Create your first page
+              </button>
+            </div>
+          )}
+        </main>
+        {trashOpen && workspace && (
+          <Trash
+            workspaceId={workspace.id}
+            onRestored={(restored, id) => {
+              addRestored(restored);
+              setSelectedId(id);
+              setTrashOpen(false);
+            }}
+            onClose={() => setTrashOpen(false)}
+            onError={reportError}
+          />
+        )}
+      </div>
+    </PagesContext.Provider>
+  );
+}

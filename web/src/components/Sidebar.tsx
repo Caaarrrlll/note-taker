@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { Doc } from "../api";
+import type { Doc, Space } from "../api";
+
+/** What the space switcher at the top of the sidebar needs. */
+export interface SpaceMenu {
+  spaces: Space[];
+  active: Space;
+  onSwitch: (id: string) => void;
+  onNew: () => void;
+  onSettings: () => void;
+}
 
 interface SidebarProps {
-  workspaceName: string;
+  spaceMenu: SpaceMenu;
   docs: Doc[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -12,7 +21,7 @@ interface SidebarProps {
   onOpenTrash: () => void;
 }
 
-export function Sidebar({ workspaceName, docs, selectedId, onSelect, onCreate, onArchive, onOpenTrash }: SidebarProps) {
+export function Sidebar({ spaceMenu, docs, selectedId, onSelect, onCreate, onArchive, onOpenTrash }: SidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { roots, children, byId } = useMemo(() => {
@@ -106,7 +115,7 @@ export function Sidebar({ workspaceName, docs, selectedId, onSelect, onCreate, o
 
   return (
     <nav className="sidebar">
-      <div className="sidebar-header">{workspaceName}</div>
+      <SpaceSwitcher menu={spaceMenu} />
       <ul className="tree">{roots.map((d) => renderItem(d, 0))}</ul>
       <button className="new-page-button" onClick={() => onCreate(null)}>
         <PlusIcon /> New page
@@ -120,7 +129,66 @@ export function Sidebar({ workspaceName, docs, selectedId, onSelect, onCreate, o
   );
 }
 
-const iconProps = { width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.6 };
+function SpaceSwitcher({ menu }: { menu: SpaceMenu }) {
+  const [open, setOpen] = useState(false);
+
+  // Close the menu on any outside click.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
+
+  const choose = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <div className="space-switcher">
+      <button
+        className="space-current"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+      >
+        <span className="space-dot" style={{ background: menu.active.color }} />
+        <span className="space-name">{menu.active.name}</span>
+        <ChevronIcon />
+      </button>
+      {open && (
+        <div className="space-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+          {menu.spaces.map((space, i) => (
+            <button
+              key={space.id}
+              role="menuitemradio"
+              aria-checked={space.id === menu.active.id}
+              className={`space-menu-item${space.id === menu.active.id ? " active" : ""}`}
+              onClick={() => choose(() => menu.onSwitch(space.id))}
+            >
+              <span className="space-dot" style={{ background: space.color }} />
+              <span className="space-name">{space.name}</span>
+              {i < 9 && <kbd>Ctrl+{i + 1}</kbd>}
+            </button>
+          ))}
+          <div className="space-menu-divider" />
+          <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onNew)}>
+            <PlusIcon /> New space…
+          </button>
+          <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onSettings)}>
+            <GearIcon /> Space settings…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const iconProps ={ width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.6 };
 
 function ChevronIcon() {
   return (
@@ -142,6 +210,18 @@ export function TrashIcon() {
   return (
     <svg {...iconProps} aria-hidden="true">
       <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg {...iconProps} aria-hidden="true">
+      <circle cx="8" cy="8" r="2.2" />
+      <path
+        d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

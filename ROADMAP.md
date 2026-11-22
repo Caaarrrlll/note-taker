@@ -139,25 +139,28 @@ A level above pages: separate **spaces** such as Work, Personal and School, each
 Typical setup: a **Work** space in a local SQLite file on the work laptop (work notes never leave it), and a **Personal** space in remote mode for things learned along the way, reachable from the work laptop, a home PC and the browser alike.
 
 **Model** (D9)
-- [ ] Space list in a local config file (`spaces.json` in the app config dir): ID, name, colour/icon, storage kind (D11: `sqlite` with a file path, `remote` with a server URL, or a direct DB URL for development), last-opened page
+
+_Status: local SQLite spaces work (switcher, new/settings/remove, choose or move the file). Remote and direct-DB spaces, keychain secrets and "test connection" come with Phase 7._
+
+- [x] Space list in a local config file (`spaces.json` in the app config dir): ID, name, colour/icon, storage kind (D11: `sqlite` with a file path, `remote` with a server URL, or a direct DB URL for development), last-opened page
 - [ ] Secrets in the OS keychain (Windows Credential Manager / Secret Service / macOS Keychain), not in `spaces.json`: the device token of a `remote` space, or the password of a direct DB connection
-- [ ] First run: one "Personal" space on the default local SQLite file. Existing installs migrate to that space without moving data.
-- [ ] `DATABASE_URL` keeps working as a dev/CI override for the default space
+- [x] First run: one "Personal" space on the default local SQLite file. Existing installs migrate to that space without moving data.
+- [x] `DATABASE_URL` keeps working as a dev/CI override for the default space
 
 **Backend**
-- [ ] Hold one connection pool per open local or direct-DB space (opened lazily, closed when a space is removed). Migrations run per connection, as today.
+- [x] Hold one connection pool per open local or direct-DB space (opened lazily, closed when a space is removed). Migrations run per connection, as today.
 - [ ] `remote` spaces hold an HTTP client instead of a pool. Each command is forwarded to the server's matching JSON endpoint (Phase 7, D7) with the device token; the server runs the same services. Needs Phase 7 first.
-- [ ] Commands take a `space_id`; services stay unchanged (they already take a connection and `user_id`)
-- [ ] Each space's database keeps its own local user and workspace, created on first connect, as today
+- [x] Commands take a `space_id`; services stay unchanged (they already take a connection and `user_id`)
+- [x] Each space's database keeps its own local user and workspace, created on first connect, as today
 - [ ] "Test connection" command for the settings screen
-- [ ] Tests: two spaces on different SQLite files stay isolated
+- [x] Tests: two spaces on different SQLite files stay isolated
 
 **Frontend**
-- [ ] Space switcher at the top of the sidebar (name + colour), with keyboard shortcut
-- [ ] Space settings: rename, colour, storage (local file, or remote: server URL + sign in to get a device token; the direct DB form only in a developer section), test connection, remove space (data is never deleted by removing a space)
-- [ ] Local SQLite location per space: pick where the space's database file lives (file picker via the Tauri dialog plugin). Options: create a new file in a chosen folder, open an existing `notes.db`, or move the current file to a new folder (copy, verify, switch; the old file is kept until the user deletes it). The path is stored in `spaces.json`; default stays `<app_data_dir>/<space>.db`. Warn when the folder is cloud-synced (OneDrive, Dropbox, Google Drive): opening the same file from two machines at once can corrupt it.
+- [x] Space switcher at the top of the sidebar (name + colour), with keyboard shortcut
+- [~] Space settings: rename, colour, storage (local file, or remote: server URL + sign in to get a device token; the direct DB form only in a developer section), test connection, remove space (data is never deleted by removing a space)
+- [x] Local SQLite location per space: pick where the space's database file lives (file picker via the Tauri dialog plugin). Options: create a new file in a chosen folder, open an existing `notes.db`, or move the current file to a new folder (copy, verify, switch; the old file is kept until the user deletes it). The path is stored in `spaces.json`; default stays `<app_data_dir>/<space>.db`. Warn when the folder is cloud-synced (OneDrive, Dropbox, Google Drive): opening the same file from two machines at once can corrupt it.
 - [ ] Clear status when a server space is unreachable (with retry), without blocking the other spaces
-- [ ] Remember the last open page per space
+- [x] Remember the last open page per space
 
 **Moving a space between storages**
 - [ ] "Move to server" / "Move to local file" in space settings, using the Phase 2 transfer tool's library code

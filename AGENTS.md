@@ -12,8 +12,9 @@ The plan and current status are in [ROADMAP.md](ROADMAP.md). Read it before star
 package.json             npm scripts + all frontend deps and the Tauri CLI (one `npm install` at the root)
 web/                     Frontend: React + TypeScript + BlockNote (Vite root; builds to web/dist)
   index.html, vite.config.ts, tsconfig.json
-  src/api.ts             Typed wrappers for every Tauri command (keep in sync with commands/)
-  src/App.tsx            Shell: loads workspace + pages, owns selection
+  src/api.ts             Typed wrappers for every Tauri command (keep in sync with commands/); `spaceApi(spaceId)` binds note commands to a space
+  src/App.tsx            Space list, switcher state (Ctrl+1–9), space dialogs
+  src/components/SpaceView.tsx  One space: workspace + pages, selection, trash (remounted per space)
   src/components/        Sidebar (page tree), PageView (title), Editor (BlockNote + autosave + / menu)
   src/editorSchema.tsx   BlockNote schema: default blocks + custom blocks (pageLink)
   src/pagesContext.ts    Page list, navigation, trash/restore for components inside the editor
@@ -28,8 +29,8 @@ crates/note-core/        Core library: everything that touches the database (no 
   src/db/migrations/     SeaORM migrations, named mYYYYMMDD_NNNNNN_description.rs
 apps/desktop/            Desktop app (Tauri shell), depends on note-core
   src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
-  src/session.rs         Session (signed-in user) — commands take the user from here
-  src/commands/          #[tauri::command] fns: State<DatabaseConnection> + State<Session>
+  src/spaces.rs          Spaces: spaces.json + one lazily opened SQLite pool (and local user) per space
+  src/commands/          #[tauri::command] fns: State<Spaces> + space_id; space_commands.rs manages spaces
   tauri.conf.json        Tauri config (frontendDist = ../../web/dist)
   capabilities/          Tauri v2 permission sets
 target/                  Build output for the whole workspace (installers in target/release/bundle/)
@@ -66,8 +67,8 @@ Migrations run automatically on connect. There's no separate migrate step.
 ## Configuration
 
 - Runtime config comes from environment variables, which are loaded from an optional `.env` through `dotenvy`.
-- `DATABASE_URL` unset: SQLite at `<app_data_dir>/notes.db`. On Windows that's `%APPDATA%\com.caaarrrlll.notetaker\notes.db`.
-- `DATABASE_URL=postgres://…` (or `postgresql://`), `mariadb://…` or `mysql://…` connects to that existing server database. `mariadb://` is rewritten to `mysql://` by `db::driver_url`, because MariaDB uses the MySQL driver. The database must already exist; the app creates the tables.
+- Spaces live in `spaces.json` in the app config dir (on Windows `%APPDATA%\com.caaarrrlll.notetaker\spaces.json`). Each space is its own SQLite file: the first-run "Personal" space uses the old `notes.db`, new spaces default to `<app_data_dir>/space-<id>.db` or a file the user picks.
+- `DATABASE_URL` is a dev/CI override for the **first** space only. `postgres://…` (or `postgresql://`), `mariadb://…` or `mysql://…` connects it to that existing server database. `mariadb://` is rewritten to `mysql://` by `db::driver_url`, because MariaDB uses the MySQL driver. The database must already exist; the app creates the tables.
 - When you add a new setting, add it to `.env.example` with a comment explaining it. Never commit `.env`.
 
 ## Database portability (important)
@@ -82,7 +83,7 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 
 ## Conventions
 
-- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<DatabaseConnection>` + `State<Session>`, user from `session.require_user()`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then a wrapper in `web/src/api.ts`.
+- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<Spaces>` + `space_id: String`; `spaces.open(&space_id)` gives the space's `db` and `user_id`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then a wrapper in `web/src/api.ts`.
 - **Ownership:** never accept a user/owner ID from the frontend. Load documents with `get_owned_document` and workspaces with `get_owned_workspace`. Another user's data is reported as NotFound.
 - **DTOs:** response structs use `#[serde(rename_all = "camelCase")]`.
 - **Migrations:** before the first release, existing migrations may still be edited (reset local DBs afterwards). After release, never edit an applied migration. Add a new one and register it in `db/migrations/mod.rs` in order.

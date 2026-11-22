@@ -1,17 +1,22 @@
 mod commands;
-mod session;
+mod spaces;
 
 use tauri::Manager;
 
 use note_core::db;
-use note_core::services::{auth_service, workspace_service};
-use crate::session::Session;
+use crate::spaces::Spaces;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            commands::list_spaces,
+            commands::create_space,
+            commands::update_space,
+            commands::remove_space,
+            commands::move_space_file,
             commands::get_current_user,
             commands::list_workspaces,
             commands::create_workspace,
@@ -32,35 +37,22 @@ pub fn run() {
             // Real environment variables take precedence over the file.
             let _ = dotenvy::dotenv();
 
-            // Without DATABASE_URL, fall back to a local SQLite file in the app data dir.
             let data_dir = app.path().app_data_dir()?;
+            let config_dir = app.path().app_config_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            let config = db::DbConfig::from_env(&data_dir)?;
-            let backend = db::backend_name(&config.url);
 
-            let (conn, user) = tauri::async_runtime::block_on(async {
-                let conn = db::connect(&config)
-                    .await
-                    .map_err(|e| format!("Failed to initialize {backend} database: {e}"))?;
-
-                // Local mode: sign in the single local user, creating it (and a
-                // first workspace) on first run. A login screen would replace this.
-                let user = auth_service::ensure_local_user(&conn).await.map_err(|e| e.to_string())?;
-                workspace_service::ensure_default_workspace(&conn, user.id)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                Ok::<_, String>((conn, user))
-            })?;
-
-            eprintln!("Using {backend} database");
-            if config.url.starts_with("sqlite") {
-                eprintln!("  {}", config.url);
+            // DATABASE_URL (dev/CI) overrides the first space's storage.
+            let first_space_override = match std::env::var("DATABASE_URL") {
+                Ok(url) if !url.trim().is_empty() => Some(db::DbConfig::from_env(&data_dir)?),
+                _ => None,
+            };
+            if let Some(config) = &first_space_override {
+                eprintln!("First space uses DATABASE_URL ({})", db::backend_name(&config.url));
             }
 
-            let session = Session::default();
-            session.sign_in(user.id);
-            app.manage(session);
-            app.manage(conn);
+            let spaces = Spaces::load(config_dir.join("spaces.json"), data_dir, first_space_override)?;
+            eprintln!("{} space(s) in {}", spaces.list().len(), config_dir.join("spaces.json").display());
+            app.manage(spaces);
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { api, type Doc } from "../api";
+import type { Doc } from "../api";
+import { usePages } from "../pagesContext";
 import { registerFlusher, trackSave } from "../pendingSaves";
 import { Editor, type SaveStatus } from "./Editor";
 
@@ -14,6 +15,7 @@ interface PageViewProps {
 
 /** One page: editable title + block editor. Remounted per page (keyed by id). */
 export function PageView({ doc, onTitleChange, onError }: PageViewProps) {
+  const { api } = usePages();
   const [title, setTitle] = useState(doc.title);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const pendingTitle = useRef<string | null>(null);

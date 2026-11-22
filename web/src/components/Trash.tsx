@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { api, type Doc } from "../api";
+import type { Doc } from "../api";
+import { usePages } from "../pagesContext";
 import { TrashIcon } from "./Sidebar";
 
 interface TrashProps {
@@ -28,13 +29,14 @@ function deletedAgo(iso: string): string {
 
 /** Trashed pages: restore them, or delete them for good. */
 export function Trash({ workspaceId, onRestored, onClose, onError }: TrashProps) {
+  const { api } = usePages();
   const [archived, setArchived] = useState<Doc[] | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api.listArchivedDocuments(workspaceId).then(setArchived, onError);
-  }, [workspaceId, onError]);
+  }, [api, workspaceId, onError]);
 
   useEffect(load, [load]);
 

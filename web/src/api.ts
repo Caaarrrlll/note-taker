@@ -1,4 +1,5 @@
 // Typed wrappers around the Rust commands (apps/desktop/src/commands).
+// Note commands always run against one space (`spaceApi(spaceId)`).
 // Argument names are camelCase here; Tauri maps them to the Rust snake_case names.
 import { invoke } from "@tauri-apps/api/core";
 
@@ -48,29 +49,56 @@ export function errorMessage(e: unknown): string {
   return String(e);
 }
 
-export const api = {
-  getCurrentUser: () => invoke<User>("get_current_user"),
+export interface Space {
+  id: string;
+  name: string;
+  /** `#rrggbb` */
+  color: string;
+  /** The space's SQLite file. */
+  path: string;
+}
 
-  listWorkspaces: () => invoke<Workspace[]>("list_workspaces"),
-  createWorkspace: (name: string) => invoke<Workspace>("create_workspace", { name }),
-
-  listDocuments: (workspaceId: string) => invoke<Doc[]>("list_documents", { workspaceId }),
-  getDocument: (id: string) => invoke<Doc>("get_document", { id }),
-  createDocument: (workspaceId: string, title: string, parentId: string | null) =>
-    invoke<Doc>("create_document", { workspaceId, title, parentId }),
-  updateDocumentTitle: (id: string, title: string) => invoke<Doc>("update_document_title", { id, title }),
-  /** Archives the page and all nested pages; resolves to the archived IDs. */
-  archiveDocument: (id: string) => invoke<string[]>("archive_document", { id }),
-  moveDocument: (id: string, parentId: string | null) => invoke<Doc>("move_document", { id, parentId }),
-
-  /** Trash: archived pages, most recently deleted first. */
-  listArchivedDocuments: (workspaceId: string) => invoke<Doc[]>("list_archived_documents", { workspaceId }),
-  /** Restores the page and its nested pages; resolves to the restored pages. */
-  restoreDocument: (id: string) => invoke<Doc[]>("restore_document", { id }),
-  /** Permanently deletes a trashed page and its nested pages; resolves to the deleted IDs. */
-  deleteDocumentPermanently: (id: string) => invoke<string[]>("delete_document_permanently", { id }),
-
-  getDocumentBlocks: (documentId: string) => invoke<StoredBlock[]>("get_document_blocks", { documentId }),
-  saveDocumentBlocks: (documentId: string, blocks: BlockInput[]) =>
-    invoke<void>("save_document_blocks", { documentId, blocks }),
+/** Spaces: separate sets of notes, each in its own database file. */
+export const spacesApi = {
+  list: () => invoke<Space[]>("list_spaces"),
+  /** `path`: an existing notes file to open, or a new file to create; omit for the default location. */
+  create: (name: string, color: string, path: string | null) => invoke<Space>("create_space", { name, color, path }),
+  update: (id: string, name: string, color: string) => invoke<Space>("update_space", { id, name, color }),
+  /** Removes the space from the list; its file stays on disk. */
+  remove: (id: string) => invoke<void>("remove_space", { id }),
+  /** Copies the file to `path`, verifies it and switches to it; the old file is kept. */
+  moveFile: (id: string, path: string) => invoke<Space>("move_space_file", { id, path }),
 };
+
+/** All note commands, bound to one space. */
+export function spaceApi(spaceId: string) {
+  const call = <T>(command: string, args: Record<string, unknown> = {}) => invoke<T>(command, { spaceId, ...args });
+  return {
+    getCurrentUser: () => call<User>("get_current_user"),
+
+    listWorkspaces: () => call<Workspace[]>("list_workspaces"),
+    createWorkspace: (name: string) => call<Workspace>("create_workspace", { name }),
+
+    listDocuments: (workspaceId: string) => call<Doc[]>("list_documents", { workspaceId }),
+    getDocument: (id: string) => call<Doc>("get_document", { id }),
+    createDocument: (workspaceId: string, title: string, parentId: string | null) =>
+      call<Doc>("create_document", { workspaceId, title, parentId }),
+    updateDocumentTitle: (id: string, title: string) => call<Doc>("update_document_title", { id, title }),
+    /** Archives the page and all nested pages; resolves to the archived IDs. */
+    archiveDocument: (id: string) => call<string[]>("archive_document", { id }),
+    moveDocument: (id: string, parentId: string | null) => call<Doc>("move_document", { id, parentId }),
+
+    /** Trash: archived pages, most recently deleted first. */
+    listArchivedDocuments: (workspaceId: string) => call<Doc[]>("list_archived_documents", { workspaceId }),
+    /** Restores the page and its nested pages; resolves to the restored pages. */
+    restoreDocument: (id: string) => call<Doc[]>("restore_document", { id }),
+    /** Permanently deletes a trashed page and its nested pages; resolves to the deleted IDs. */
+    deleteDocumentPermanently: (id: string) => call<string[]>("delete_document_permanently", { id }),
+
+    getDocumentBlocks: (documentId: string) => call<StoredBlock[]>("get_document_blocks", { documentId }),
+    saveDocumentBlocks: (documentId: string, blocks: BlockInput[]) =>
+      call<void>("save_document_blocks", { documentId, blocks }),
+  };
+}
+
+export type SpaceApi = ReturnType<typeof spaceApi>;
