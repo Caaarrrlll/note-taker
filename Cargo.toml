@@ -3,7 +3,7 @@
 resolver = "2"
 members = [
     "crates/note-core",
-    "src-tauri",
+    "apps/desktop",
 ]
 
 [workspace.package]

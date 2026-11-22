@@ -9,15 +9,16 @@ The plan and current status are in [ROADMAP.md](ROADMAP.md). Read it before star
 ## Layout
 
 ```
-index.html, vite.config.ts  Vite entry/config (dev server on :1420)
-src/                     Frontend: React + TypeScript + BlockNote
-  api.ts                 Typed wrappers for every Tauri command (keep in sync with commands/)
-  App.tsx                Shell: loads workspace + pages, owns selection
-  components/            Sidebar (page tree), PageView (title), Editor (BlockNote + autosave + / menu)
-  editorSchema.tsx       BlockNote schema: default blocks + custom blocks (pageLink)
-  pagesContext.ts        Page list, navigation, trash/restore for components inside the editor
-  pendingSaves.ts        Flush-on-close registry for debounced saves
-Cargo.toml               Cargo workspace (D12): members crates/note-core, src-tauri; shared dependency versions
+package.json             npm scripts + all frontend deps and the Tauri CLI (one `npm install` at the root)
+web/                     Frontend: React + TypeScript + BlockNote (Vite root; builds to web/dist)
+  index.html, vite.config.ts, tsconfig.json
+  src/api.ts             Typed wrappers for every Tauri command (keep in sync with commands/)
+  src/App.tsx            Shell: loads workspace + pages, owns selection
+  src/components/        Sidebar (page tree), PageView (title), Editor (BlockNote + autosave + / menu)
+  src/editorSchema.tsx   BlockNote schema: default blocks + custom blocks (pageLink)
+  src/pagesContext.ts    Page list, navigation, trash/restore for components inside the editor
+  src/pendingSaves.ts    Flush-on-close registry for debounced saves
+Cargo.toml               Cargo workspace (D12): members crates/note-core, apps/desktop; shared dependency versions
 crates/note-core/        Core library: everything that touches the database (no Tauri, no HTTP)
   src/error.rs           AppError, serialized to the frontend as { kind, message }
   src/services/          Business logic + queries; generic over `ConnectionTrait`
@@ -25,11 +26,11 @@ crates/note-core/        Core library: everything that touches the database (no 
   src/entities/          SeaORM entity models (users, workspaces, documents, blocks)
   src/db/mod.rs          DbConfig (env + SQLite fallback) and connect() (also runs migrations)
   src/db/migrations/     SeaORM migrations, named mYYYYMMDD_NNNNNN_description.rs
-src-tauri/               Desktop app (Tauri shell), depends on note-core
+apps/desktop/            Desktop app (Tauri shell), depends on note-core
   src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
   src/session.rs         Session (signed-in user) — commands take the user from here
   src/commands/          #[tauri::command] fns: State<DatabaseConnection> + State<Session>
-  tauri.conf.json        Tauri config (frontendDist = ../dist)
+  tauri.conf.json        Tauri config (frontendDist = ../../web/dist)
   capabilities/          Tauri v2 permission sets
 target/                  Build output for the whole workspace (installers in target/release/bundle/)
 Makefile.toml            cargo-make tasks (dev, build, test, clean, ...)
@@ -81,7 +82,7 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 
 ## Conventions
 
-- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<DatabaseConnection>` + `State<Session>`, user from `session.require_user()`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then a wrapper in `src/api.ts`.
+- **Adding a feature end to end:** migration (if the schema changes), then entity, then service fn (generic over `ConnectionTrait`, taking `user_id` and checking ownership), then command (`State<DatabaseConnection>` + `State<Session>`, user from `session.require_user()`), then register it in `generate_handler!` in `lib.rs`, then a test in `services/tests.rs`, then a wrapper in `web/src/api.ts`.
 - **Ownership:** never accept a user/owner ID from the frontend. Load documents with `get_owned_document` and workspaces with `get_owned_workspace`. Another user's data is reported as NotFound.
 - **DTOs:** response structs use `#[serde(rename_all = "camelCase")]`.
 - **Migrations:** before the first release, existing migrations may still be edited (reset local DBs afterwards). After release, never edit an applied migration. Add a new one and register it in `db/migrations/mod.rs` in order.
@@ -94,6 +95,6 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 ## Gotchas
 
 - Keep the npm `@tauri-apps/api` minor version in line with the Rust `tauri` crate (both 2.11 now). The Tauri CLI warns about a mismatch.
-- Page edits autosave after 600 ms (titles after 400 ms). Anything with a debounced save must use `registerFlusher`/`trackSave` from `src/pendingSaves.ts` so it is flushed when the window closes.
+- Page edits autosave after 600 ms (titles after 400 ms). Anything with a debounced save must use `registerFlusher`/`trackSave` from `web/src/pendingSaves.ts` so it is flushed when the window closes.
 - In-memory SQLite (`sqlite::memory:`) is forced to a single connection, because each connection would otherwise get its own empty database.
 - The dev environment is Windows. The cargo-make scripts use PowerShell commands.

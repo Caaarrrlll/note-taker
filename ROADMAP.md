@@ -206,7 +206,7 @@ Run the same app in a browser, served from one container on a home server (e.g. 
   Move in small steps that each build and pass the tests: create the workspace and `note-core` first (Phase 2 needs it), then move `src-tauri` and `src`, then add `note-server`. The Tauri app, web server and transfer tool all depend on `note-core`.
 
   - [x] Step 1: Cargo workspace at the repo root + `crates/note-core` (entities, migrations, services, errors, tests). `src-tauri` depends on it; build output moved to the root `target/`.
-  - [ ] Step 2: move `src-tauri` to `apps/desktop` and `src` to `web/`
+  - [x] Step 2: move `src-tauri` to `apps/desktop` and `src` to `web/` (Vite root is `web/`, one `package.json` at the repo root)
   - [ ] Step 3: add `crates/note-server`
 - [ ] Shared API types: request and response structs live in `note-core` (or a small `note-api` crate), used by the server and by the desktop's remote client, so both sides can't drift. Generate the TypeScript types for `web/` from them (e.g. `ts-rs` or `specta`) instead of writing them twice.
 - [ ] Web server binary (`note-server`, using axum): JSON endpoints mirroring the Tauri commands (D7), serving the built frontend as static files on the same port

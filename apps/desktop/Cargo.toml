@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 chrono.workspace = true
 dotenvy = "0.15"
-note-core = { path = "../crates/note-core" }
+note-core = { path = "../../crates/note-core" }
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

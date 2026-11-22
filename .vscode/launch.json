@@ -6,7 +6,7 @@
       "request": "launch",
       "name": "Tauri Dev (cargo tauri dev)",
       "cargo": {
-        "args": ["--manifest-path", "./src-tauri/Cargo.toml"]
+        "args": ["--manifest-path", "./apps/desktop/Cargo.toml"]
       },
       "cwd": "${workspaceFolder}"
     },
@@ -15,7 +15,7 @@
       "request": "launch",
       "name": "Tauri Dev (Debug Build)",
       "cargo": {
-        "args": ["build", "--manifest-path", "./src-tauri/Cargo.toml"],
+        "args": ["build", "--manifest-path", "./apps/desktop/Cargo.toml"],
         "filter": {
           "name": "note-taker",
           "kind": "bin"

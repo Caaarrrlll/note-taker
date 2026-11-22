@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
-    "preview": "vite preview",
+    "dev": "vite web",
+    "build": "tsc --noEmit -p web && vite build web",
+    "typecheck": "tsc --noEmit -p web",
+    "preview": "vite preview web",
     "tauri": "tauri"
   },
   "devDependencies": {

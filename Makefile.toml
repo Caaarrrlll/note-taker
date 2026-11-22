@@ -9,13 +9,13 @@ args = ["clean"]
 
 [tasks.clean-frontend]
 description = "Remove frontend build artifacts"
-script = ["Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"]
+script = ["Remove-Item -Recurse -Force web/dist -ErrorAction SilentlyContinue"]
 
 [tasks.clean-all]
 description = "Remove all build artifacts and dependencies"
 dependencies = ["clean"]
 script = '''
-Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force web/dist -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
 '''
 
@@ -60,8 +60,8 @@ command = "npm"
 args = ["run", "tauri", "build"]
 
 [tasks.icons]
-description = "Regenerate all app icons from src-tauri/icons/app-icon.svg"
+description = "Regenerate all app icons from apps/desktop/icons/app-icon.svg"
 script = '''
-npm run tauri icon src-tauri/icons/app-icon.svg
-Remove-Item -Recurse -Force src-tauri/icons/android, src-tauri/icons/ios -ErrorAction SilentlyContinue
+npm run tauri icon apps/desktop/icons/app-icon.svg
+Remove-Item -Recurse -Force apps/desktop/icons/android, apps/desktop/icons/ios -ErrorAction SilentlyContinue
 '''
