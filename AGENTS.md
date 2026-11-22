@@ -86,7 +86,7 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 - Commands return response DTOs (`*Response`), not raw entity models.
 - IDs are UUID v4, generated in Rust.
 - Keep commands thin. Logic belongs in `services/`.
-- Keep `services/`, `entities/` and `db/` free of Tauri types. A self-hosted web server (ROADMAP Phase 6) will reuse them behind HTTP endpoints, so the user ID must always arrive as a parameter.
+- Keep `services/`, `entities/` and `db/` free of Tauri types. A self-hosted web server (ROADMAP Phase 7) will reuse them behind HTTP endpoints, so the user ID must always arrive as a parameter.
 
 ## Gotchas
 
