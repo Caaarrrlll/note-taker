@@ -409,6 +409,14 @@ async fn deleting_a_workspace_cascades_to_documents_and_blocks() {
 }
 
 #[test]
+fn mariadb_urls_use_the_mysql_driver() {
+    assert_eq!(db::driver_url("mariadb://u:p@host:3306/notes"), "mysql://u:p@host:3306/notes");
+    assert_eq!(db::driver_url("mysql://u:p@host:3306/notes"), "mysql://u:p@host:3306/notes");
+    assert_eq!(db::driver_url("postgresql://u:p@host/notes"), "postgresql://u:p@host/notes");
+    assert_eq!(db::backend_name("mariadb://u:p@host/notes"), "MySQL/MariaDB");
+}
+
+#[test]
 fn sqlite_url_from_windows_path() {
     let url = db::sqlite_url_for(std::path::Path::new(r"C:\Users\me\AppData\Roaming\app\notes.db"));
     assert_eq!(url, "sqlite://C:/Users/me/AppData/Roaming/app/notes.db?mode=rwc");

@@ -73,7 +73,7 @@ jobs:
           - db: mariadb
             image: mariadb:11.4
             port: 3306
-            url: mysql://note_taker:note_taker@127.0.0.1:3306/note_taker
+            url: mariadb://note_taker:note_taker@127.0.0.1:3306/note_taker
             health: healthcheck.sh --connect --innodb_initialized
     services:
       db:
