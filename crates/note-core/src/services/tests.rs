@@ -13,6 +13,7 @@ use uuid::Uuid;
 use super::auth_service::*;
 use super::block_service::*;
 use super::document_service::*;
+use super::session_service::*;
 use super::workspace_service::*;
 use crate::db::{self, DbConfig};
 use crate::entities::{blocks, documents, users, workspaces};
@@ -121,6 +122,38 @@ async fn concurrent_first_run_creates_one_local_user() {
     );
     let ids: Vec<Uuid> = [a, b, c, d].into_iter().map(|r| r.expect("ensure_local_user").id).collect();
     assert!(ids.iter().all(|id| *id == ids[0]), "all callers get the same local user");
+}
+
+#[tokio::test]
+async fn sessions_resolve_expire_and_log_out() {
+    let db = test_db().await;
+    let user = seed_user(&db).await;
+
+    let token = create_session(&db, user.id, chrono::Duration::days(1)).await.unwrap();
+    assert_eq!(token.len(), 64, "32 random bytes as hex");
+    assert_eq!(user_for_token(&db, &token).await.unwrap(), Some(user.id));
+    assert_eq!(user_for_token(&db, "not-a-token").await.unwrap(), None);
+
+    // The raw token is never stored, only its hash.
+    let stored = crate::entities::sessions::Entity::find().all(&db).await.unwrap();
+    assert!(stored.iter().all(|s| s.token_hash != token));
+
+    delete_session(&db, &token).await.unwrap();
+    assert_eq!(user_for_token(&db, &token).await.unwrap(), None, "logged out");
+
+    let expired = create_session(&db, user.id, chrono::Duration::seconds(-1)).await.unwrap();
+    assert_eq!(user_for_token(&db, &expired).await.unwrap(), None, "expired sessions don't count");
+}
+
+#[tokio::test]
+async fn has_accounts_ignores_the_local_user() {
+    let db = test_db().await;
+    ensure_local_user(&db).await.unwrap();
+    if !is_shared_server_db() {
+        assert!(!has_accounts(&db).await.unwrap());
+    }
+    register(&db, &format!("{}@example.com", Uuid::new_v4()), "Alice", "s3cret-pass").await.unwrap();
+    assert!(has_accounts(&db).await.unwrap());
 }
 
 #[tokio::test]

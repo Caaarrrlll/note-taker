@@ -1,38 +1,11 @@
-use chrono::{DateTime, Utc};
-use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
 
-use note_core::entities::documents;
+use note_core::api::DocumentResponse;
 use note_core::error::AppResult;
 use note_core::services::document_service;
 use crate::spaces::Spaces;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DocumentResponse {
-    pub id: Uuid,
-    pub title: String,
-    pub workspace_id: Uuid,
-    pub parent_id: Option<Uuid>,
-    pub is_archived: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl From<documents::Model> for DocumentResponse {
-    fn from(m: documents::Model) -> Self {
-        Self {
-            id: m.id,
-            title: m.title,
-            workspace_id: m.workspace_id,
-            parent_id: m.parent_id,
-            is_archived: m.is_archived,
-            created_at: m.created_at,
-            updated_at: m.updated_at,
-        }
-    }
-}
 
 #[tauri::command]
 pub async fn list_documents(

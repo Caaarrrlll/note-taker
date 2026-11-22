@@ -4,6 +4,7 @@
 //! transfer tool (ROADMAP D12). Keep it free of Tauri and HTTP types: callers
 //! pass in the database connection and the signed-in user's ID.
 
+pub mod api;
 pub mod db;
 pub mod entities;
 pub mod error;

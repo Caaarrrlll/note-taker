@@ -1,7 +1,36 @@
 // Typed wrappers around the Rust commands (apps/desktop/src/commands).
 // Note commands always run against one space (`spaceApi(spaceId)`).
 // Argument names are camelCase here; Tauri maps them to the Rust snake_case names.
-import { invoke } from "@tauri-apps/api/core";
+//
+// Two transports, chosen at build time:
+// - desktop: Tauri `invoke`
+// - web (`vite --mode web`): `POST /api/<command>` on note-server, same names and JSON
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+
+export const IS_WEB = import.meta.env.MODE === "web";
+
+/** Fired when the server says the session is gone; the app shows the sign-in screen. */
+export const SIGNED_OUT_EVENT = "note-taker:signed-out";
+
+async function post<T>(path: string, args: Record<string, unknown>): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-Requested-With": "note-taker" },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : undefined;
+  if (!res.ok) {
+    if (res.status === 401 && body?.kind === "unauthenticated") window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+    throw body ?? { kind: "internal", message: `Server error ${res.status}` };
+  }
+  return body as T;
+}
+
+function invoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  return IS_WEB ? post<T>(`/api/${command}`, args) : tauriInvoke<T>(command, args);
+}
 
 export interface User {
   id: string;
@@ -40,7 +69,15 @@ export interface BlockInput {
 
 /** Shape of errors returned by commands (see crates/note-core/src/error.rs). */
 export interface ApiError {
-  kind: "database" | "notFound" | "unauthenticated" | "invalidCredentials" | "invalid" | "internal";
+  kind:
+    | "database"
+    | "notFound"
+    | "unauthenticated"
+    | "invalidCredentials"
+    | "invalid"
+    | "internal"
+    | "forbidden"
+    | "rateLimited";
   message: string;
 }
 
@@ -58,9 +95,12 @@ export interface Space {
   path: string;
 }
 
-/** Spaces: separate sets of notes, each in its own database file. */
+/** On the web, the signed-in account is the one and only space. */
+const WEB_SPACE: Space = { id: "server", name: "Notes", color: "#3b82f6", path: "" };
+
+/** Spaces: separate sets of notes, each in its own database file (desktop only). */
 export const spacesApi = {
-  list: () => invoke<Space[]>("list_spaces"),
+  list: () => (IS_WEB ? Promise.resolve([WEB_SPACE]) : invoke<Space[]>("list_spaces")),
   /** `path`: an existing notes file to open, or a new file to create; omit for the default location. */
   create: (name: string, color: string, path: string | null) => invoke<Space>("create_space", { name, color, path }),
   update: (id: string, name: string, color: string) => invoke<Space>("update_space", { id, name, color }),
@@ -102,3 +142,25 @@ export function spaceApi(spaceId: string) {
 }
 
 export type SpaceApi = ReturnType<typeof spaceApi>;
+
+export interface AuthStatus {
+  /** No accounts yet: the first visitor creates one. */
+  needsSetup: boolean;
+  registrationOpen: boolean;
+  user: User | null;
+}
+
+/** Sign-in for the web app (note-server). */
+export const authApi = {
+  status: async (): Promise<AuthStatus> => {
+    const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+    if (!res.ok) throw { kind: "internal", message: `Server error ${res.status}` };
+    return res.json();
+  },
+  setup: (email: string, displayName: string, password: string) =>
+    post<User>("/api/auth/setup", { email, displayName, password }),
+  register: (email: string, displayName: string, password: string) =>
+    post<User>("/api/auth/register", { email, displayName, password }),
+  login: (email: string, password: string) => post<User>("/api/auth/login", { email, password }),
+  logout: () => post<void>("/api/auth/logout", {}),
+};

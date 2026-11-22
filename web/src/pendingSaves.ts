@@ -27,6 +27,11 @@ export function trackSave<T>(promise: Promise<T>): Promise<T> {
   return promise;
 }
 
+/** Saves still on their way to the backend. */
+export function hasSavesInFlight(): boolean {
+  return inFlight.size > 0;
+}
+
 export async function flushPendingSaves(timeoutMs = 3000): Promise<void> {
   for (const flush of flushers) flush();
   const all = Promise.allSettled([...inFlight]);

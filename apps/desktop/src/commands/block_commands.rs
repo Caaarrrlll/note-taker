@@ -1,25 +1,11 @@
-use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
 
-use note_core::entities::blocks;
+use note_core::api::BlockResponse;
 use note_core::error::AppResult;
 use note_core::services::block_service::{self, BlockInput};
 use crate::spaces::Spaces;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockResponse {
-    pub id: Uuid,
-    pub block_type: String,
-    pub content: serde_json::Value,
-}
-
-impl From<blocks::Model> for BlockResponse {
-    fn from(m: blocks::Model) -> Self {
-        Self { id: m.id, block_type: m.block_type, content: m.content }
-    }
-}
 
 #[tauri::command]
 pub async fn get_document_blocks(

@@ -7,8 +7,11 @@ export interface SpaceMenu {
   spaces: Space[];
   active: Space;
   onSwitch: (id: string) => void;
-  onNew: () => void;
-  onSettings: () => void;
+  /** Desktop only: create and manage spaces. */
+  onNew?: () => void;
+  onSettings?: () => void;
+  /** Web only: the signed-in account and sign-out. */
+  account?: { label: string; onSignOut: () => void };
 }
 
 interface SidebarProps {
@@ -176,12 +179,24 @@ function SpaceSwitcher({ menu }: { menu: SpaceMenu }) {
             </button>
           ))}
           <div className="space-menu-divider" />
-          <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onNew)}>
-            <PlusIcon /> New space…
-          </button>
-          <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onSettings)}>
-            <GearIcon /> Space settings…
-          </button>
+          {menu.onNew && (
+            <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onNew!)}>
+              <PlusIcon /> New space…
+            </button>
+          )}
+          {menu.onSettings && (
+            <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.onSettings!)}>
+              <GearIcon /> Space settings…
+            </button>
+          )}
+          {menu.account && (
+            <>
+              <div className="space-menu-account">{menu.account.label}</div>
+              <button role="menuitem" className="space-menu-item" onClick={() => choose(menu.account!.onSignOut)}>
+                Sign out
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
