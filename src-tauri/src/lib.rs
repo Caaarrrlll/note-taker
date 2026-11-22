@@ -1,13 +1,10 @@
 mod commands;
-mod db;
-mod entities;
-mod error;
-mod services;
 mod session;
 
 use tauri::Manager;
 
-use crate::services::{auth_service, workspace_service};
+use note_core::db;
+use note_core::services::{auth_service, workspace_service};
 use crate::session::Session;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
