@@ -8,7 +8,7 @@
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::Argon2;
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use uuid::Uuid;
 
 use crate::entities::users;
@@ -18,17 +18,24 @@ use crate::error::{AppError, AppResult};
 pub const LOCAL_USER_EMAIL: &str = "local@note-taker.invalid";
 pub const MIN_PASSWORD_LEN: usize = 8;
 
-/// Return the local user, creating it on first run.
-pub async fn ensure_local_user<C: ConnectionTrait>(db: &C) -> AppResult<users::Model> {
-    if let Some(user) = users::Entity::find()
+async fn find_local_user<C: ConnectionTrait>(db: &C) -> AppResult<Option<users::Model>> {
+    Ok(users::Entity::find()
         .filter(users::Column::IsLocal.eq(true))
         .one(db)
-        .await?
-    {
+        .await?)
+}
+
+/// Return the local user, creating it on first run.
+///
+/// Safe when several callers race on a fresh database (two app instances, or
+/// parallel tests on a shared server DB): the unique email lets only one insert
+/// win, and the others return the user that won.
+pub async fn ensure_local_user<C: ConnectionTrait>(db: &C) -> AppResult<users::Model> {
+    if let Some(user) = find_local_user(db).await? {
         return Ok(user);
     }
 
-    let user = users::ActiveModel {
+    let inserted = users::ActiveModel {
         id: Set(Uuid::new_v4()),
         email: Set(LOCAL_USER_EMAIL.into()),
         display_name: Set("Local User".into()),
@@ -37,8 +44,15 @@ pub async fn ensure_local_user<C: ConnectionTrait>(db: &C) -> AppResult<users::M
         ..Default::default()
     }
     .insert(db)
-    .await?;
-    Ok(user)
+    .await;
+
+    match inserted {
+        Ok(user) => Ok(user),
+        Err(e) if matches!(e.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
+            find_local_user(db).await?.ok_or(AppError::Db(e))
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 pub async fn get_user<C: ConnectionTrait>(db: &C, id: Uuid) -> AppResult<users::Model> {

@@ -1,7 +1,7 @@
 use std::sync::RwLock;
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
+use note_core::error::{AppError, AppResult};
 
 /// Who is signed in to this app instance. Managed as Tauri state.
 ///

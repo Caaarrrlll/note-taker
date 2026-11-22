@@ -5,7 +5,7 @@
       "label": "cargo build",
       "type": "shell",
       "command": "cargo",
-      "args": ["build", "--manifest-path", "./src-tauri/Cargo.toml"],
+      "args": ["build", "--workspace"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -16,7 +16,7 @@
       "label": "cargo check",
       "type": "shell",
       "command": "cargo",
-      "args": ["check", "--manifest-path", "./src-tauri/Cargo.toml"],
+      "args": ["check", "--workspace"],
       "group": "build",
       "problemMatcher": ["$rustc"]
     },

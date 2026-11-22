@@ -4,7 +4,6 @@ default_to_workspace = false
 [tasks.clean]
 description = "Remove Rust build artifacts"
 workspace = false
-cwd = "src-tauri"
 command = "cargo"
 args = ["clean"]
 
@@ -52,9 +51,8 @@ npm install
 
 [tasks.test]
 description = "Run backend tests (in-memory SQLite; set TEST_DATABASE_URL to test a server DB)"
-cwd = "src-tauri"
 command = "cargo"
-args = ["test"]
+args = ["test", "--workspace"]
 
 [tasks.bundle]
 description = "Build installers for the current OS (Windows: .msi + .exe; Linux: .deb + AppImage; macOS: .dmg)"

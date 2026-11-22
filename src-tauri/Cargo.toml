@@ -1,25 +1,21 @@
 [package]
 name = "note-taker"
-version = "0.1.0"
-edition = "2021"
 description = "Block-based note-taking desktop app"
-license = "GPL-3.0-or-later"
-repository = "https://github.com/Caaarrrlll/note-taker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
+chrono.workspace = true
+dotenvy = "0.15"
+note-core = { path = "../crates/note-core" }
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sea-orm = { version = "1", features = ["sqlx-sqlite", "sqlx-postgres", "sqlx-mysql", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = { version = "1", features = ["sqlx-sqlite", "sqlx-postgres", "sqlx-mysql", "runtime-tokio-rustls"] }
-tokio = { version = "1", features = ["full"] }
-thiserror = "2"
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-async-trait = "0.1"
-dotenvy = "0.15"
-argon2 = "0.5"
+uuid.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -27,7 +23,3 @@ tauri-build = { version = "2", features = [] }
 [lib]
 name = "note_taker_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
-
-# Password hashing is deliberately slow; optimise it even in debug builds/tests.
-[profile.dev.package.argon2]
-opt-level = 3

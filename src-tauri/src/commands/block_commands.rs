@@ -3,9 +3,9 @@ use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
 
-use crate::entities::blocks;
-use crate::error::AppResult;
-use crate::services::block_service::{self, BlockInput};
+use note_core::entities::blocks;
+use note_core::error::AppResult;
+use note_core::services::block_service::{self, BlockInput};
 use crate::session::Session;
 
 #[derive(Serialize)]

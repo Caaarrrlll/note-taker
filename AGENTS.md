@@ -17,18 +17,21 @@ src/                     Frontend: React + TypeScript + BlockNote
   editorSchema.tsx       BlockNote schema: default blocks + custom blocks (pageLink)
   pagesContext.ts        Page list, navigation, trash/restore for components inside the editor
   pendingSaves.ts        Flush-on-close registry for debounced saves
-src-tauri/
-  src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
-  src/session.rs         Session (signed-in user) — commands take the user from here
+Cargo.toml               Cargo workspace (D12): members crates/note-core, src-tauri; shared dependency versions
+crates/note-core/        Core library: everything that touches the database (no Tauri, no HTTP)
   src/error.rs           AppError, serialized to the frontend as { kind, message }
-  src/commands/          #[tauri::command] fns: State<DatabaseConnection> + State<Session>
   src/services/          Business logic + queries; generic over `ConnectionTrait`
   src/services/tests.rs  Integration tests (in-memory SQLite by default)
   src/entities/          SeaORM entity models (users, workspaces, documents, blocks)
   src/db/mod.rs          DbConfig (env + SQLite fallback) and connect() (also runs migrations)
   src/db/migrations/     SeaORM migrations, named mYYYYMMDD_NNNNNN_description.rs
-  tauri.conf.json        Tauri config (frontendDist = ../src)
+src-tauri/               Desktop app (Tauri shell), depends on note-core
+  src/lib.rs             App entry: .env, DB connect, local-user sign-in, app.manage(...), commands
+  src/session.rs         Session (signed-in user) — commands take the user from here
+  src/commands/          #[tauri::command] fns: State<DatabaseConnection> + State<Session>
+  tauri.conf.json        Tauri config (frontendDist = ../dist)
   capabilities/          Tauri v2 permission sets
+target/                  Build output for the whole workspace (installers in target/release/bundle/)
 Makefile.toml            cargo-make tasks (dev, build, test, clean, ...)
 .env.example             Optional local config; copy to .env
 ```
@@ -48,9 +51,9 @@ Prerequisites: Rust stable, Node.js, and `cargo install tauri-cli cargo-make`. N
 npm install                       # once (or: cargo make install)
 cargo make dev                    # = cargo tauri dev; starts Vite too (local SQLite unless DATABASE_URL is set)
 npm run typecheck                 # frontend type check
-cargo make bundle                 # = npm run tauri build: installers for this OS (src-tauri/target/release/bundle/)
-cargo make test                   # backend tests on in-memory SQLite
-cargo clippy --manifest-path src-tauri/Cargo.toml
+cargo make bundle                 # = npm run tauri build: installers for this OS (target/release/bundle/)
+cargo make test                   # = cargo test --workspace (backend tests on in-memory SQLite)
+cargo clippy --workspace --all-targets -- -D warnings
 ```
 
 The Tauri CLI is also an npm dev dependency (`npm run tauri ...`), pinned to the same minor version as the Rust `tauri` crate.
@@ -86,7 +89,7 @@ Every change must work on **SQLite, PostgreSQL and MySQL/MariaDB**.
 - Commands return response DTOs (`*Response`), not raw entity models.
 - IDs are UUID v4, generated in Rust.
 - Keep commands thin. Logic belongs in `services/`.
-- Keep `services/`, `entities/` and `db/` free of Tauri types. A self-hosted web server (ROADMAP Phase 7) will reuse them behind HTTP endpoints, so the user ID must always arrive as a parameter.
+- `note-core` must stay free of Tauri types (it doesn't depend on Tauri at all). A self-hosted web server (ROADMAP Phase 7) will reuse them behind HTTP endpoints, so the user ID must always arrive as a parameter.
 
 ## Gotchas
 

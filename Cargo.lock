@@ -2474,22 +2474,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "note-taker"
+name = "note-core"
 version = "0.1.0"
 dependencies = [
  "argon2",
  "async-trait",
  "chrono",
- "dotenvy",
  "sea-orm",
  "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "note-taker"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dotenvy",
+ "note-core",
+ "sea-orm",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",
- "thiserror 2.0.20",
- "tokio",
  "uuid",
 ]
 
@@ -4910,9 +4922,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

@@ -111,6 +111,19 @@ async fn register_and_login() {
 }
 
 #[tokio::test]
+async fn concurrent_first_run_creates_one_local_user() {
+    let db = test_db().await;
+    let (a, b, c, d) = tokio::join!(
+        ensure_local_user(&db),
+        ensure_local_user(&db),
+        ensure_local_user(&db),
+        ensure_local_user(&db),
+    );
+    let ids: Vec<Uuid> = [a, b, c, d].into_iter().map(|r| r.expect("ensure_local_user").id).collect();
+    assert!(ids.iter().all(|id| *id == ids[0]), "all callers get the same local user");
+}
+
+#[tokio::test]
 async fn local_user_cannot_log_in_with_a_password() {
     let db = test_db().await;
     ensure_local_user(&db).await.unwrap();

@@ -1,7 +1,7 @@
 # Builds installers and attaches them to a *draft* GitHub release.
 #
 # To release:
-#   1. Bump "version" in src-tauri/tauri.conf.json (and package.json / Cargo.toml to match)
+#   1. Bump "version" in src-tauri/tauri.conf.json (and package.json / the root Cargo.toml to match)
 #   2. Commit, then tag and push:   git tag v0.2.0 && git push origin v0.2.0
 #   3. Wait for this workflow, review the draft release on GitHub, and publish it.
 #
@@ -56,8 +56,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - run: npm ci
 
